@@ -2,7 +2,7 @@ CC = gcc
 IN = main.c src/main_state.c src/glad/glad.c
 OUT = main.out
 CFLAGS = -Wall -DGLFW_INCLUDE_NONE
-LFLAGS = -lglfw -ldl -lm -lGL
+LFLAGS = -lglfw -ldl -lm
 IFLAGS = -I. -I./include
 
 .SILENT all: clean build run
