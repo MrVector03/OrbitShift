@@ -13,8 +13,7 @@ extern const rafgl_pixel_rgb_t sky_color;
 
 void draw_realistic_sun(rafgl_raster_t raster, int x, int y, int radius);
 
-void draw_realistic_sun_with_texture(rafgl_raster_t raster, int x, int y, int radius, rafgl_raster_t sun_texture);
-
+void draw_realistic_sun_with_texture(rafgl_raster_t raster, int x, int y, int radius, rafgl_raster_t sun_texture, double smooth_factor);
 
 void generate_starfield(rafgl_raster_t raster, int num_stars);
 

@@ -122,4 +122,63 @@ rafgl_raster_t generate_perlin(int octaves, double persistence) {
     return raster;
 }
 
+rafgl_raster_t generate_animated_perlin(int octaves, double persistence, double p_time) {
+    srand(time(NULL));
+
+    int octave_size = 2;
+    double multiplier = 1.0;
+    //printf("jhere")
+
+    rafgl_raster_t raster;
+
+    int width = pow(2, octaves);
+    int height = width;
+
+    int x, y, octave;
+    double *tmp_map = malloc(height * width * sizeof(double));
+    double *perlin_map = calloc(height * width, sizeof(double));
+    double *octave_map;
+    rafgl_pixel_rgb_t pix;
+    rafgl_raster_init(&raster, width, height);
+
+    for (octave = 0; octave < octaves; octave++) {
+        octave_map = malloc(octave_size * octave_size * sizeof(double));
+        for (y = 0; y < octave_size; y++) {
+            for (x = 0; x < octave_size; x++) {
+                // Use time to influence octave values for smooth movement
+                octave_map[y * octave_size + x] = (1.0 + randf()) * 2.0 - 1.0 + sin(p_time * 0.1 + x + y);
+            }
+        }
+
+        cosine_map_rescale(tmp_map, width, height, octave_map, octave_size, octave_size);
+        map_multiply_and_add(perlin_map, tmp_map, width, height, multiplier);
+
+        octave_size *= 2;
+        multiplier *= persistence;
+        memset(tmp_map, 0, height * width * sizeof(double));
+        free(octave_map);
+    }
+
+    float sample;
+
+    for (y = 0; y < height; y++) {
+        for (x = 0; x < width; x++) {
+            // Modify sample value to add smooth changes
+            sample = perlin_map[y * width + x] + sin(p_time * 0.05);
+            sample = (sample + 1.0) / 2.0;
+            if (sample < 0.0) sample = 0.0;
+            if (sample > 1.0) sample = 1.0;
+            pix.r = sample * 255;
+            pix.g = sample * 255;
+            pix.b = sample * 255;
+
+            pixel_at_m(raster, x, y) = pix;
+        }
+    }
+
+    free(perlin_map);
+    free(tmp_map);
+
+    return raster;
+}
 

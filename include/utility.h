@@ -11,6 +11,8 @@ void cosine_map_rescale(double *dst, int dst_width, int dst_height, double *src,
 
 rafgl_raster_t generate_perlin(int octaves, double persistence);
 
+rafgl_raster_t generate_animated_perlin(int octaves, double persistence, double time);
+
 void map_multiply_and_add(double *dst, double *src, int w, int h, double multiplier);
 
 #endif //UTILITY_H
