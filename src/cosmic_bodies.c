@@ -1,6 +1,7 @@
 #include <cosmic_bodies.h>
 #include <rafgl.h>
 #include <game_constants.h>
+#include <time.h>
 
 // CONSTANTS
 
@@ -118,4 +119,29 @@ void generate_starfield(rafgl_raster_t raster, int num_stars) {
         int y = rand() % RASTER_HEIGHT;
         pixel_at_m(raster, x, y).rgba = rafgl_RGB(255, 255, 255);
     }
+}
+
+solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x, int sun_y, rafgl_raster_t sun_texture) {
+    int curr_orbit_radius_x = 200;
+    int curr_orbit_radius_y = 100;
+
+    solar_system_t solar_system;
+    solar_system.sun = (cosmic_body_t){sun_x, sun_y, sun_radius, 1, sun_texture, sun_x, sun_y, curr_orbit_radius_x, curr_orbit_radius_y};
+    solar_system.num_bodies = num_planets;
+    srand(time(NULL));
+
+    for (int i = 0; i < num_planets; i++) {
+        cosmic_body_t planet;
+        planet.orbit_center_x = sun_x;
+        planet.orbit_center_y = sun_y;
+        planet.orbit_radius_x = curr_orbit_radius_x;
+        planet.orbit_radius_y = curr_orbit_radius_y;
+
+        solar_system.planets[i] = planet;
+
+        curr_orbit_radius_x += rand() % 100 + 50;
+        curr_orbit_radius_y += rand() % 50 + 25;
+    }
+
+    return solar_system;
 }

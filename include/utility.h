@@ -15,4 +15,6 @@ rafgl_raster_t generate_animated_perlin(int octaves, double persistence, double 
 
 void map_multiply_and_add(double *dst, double *src, int w, int h, double multiplier);
 
+void draw_ellipse(rafgl_raster_t raster, int xc, int yc, int rx, int ry, rafgl_pixel_rgb_t color);
+
 #endif //UTILITY_H

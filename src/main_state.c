@@ -23,10 +23,11 @@ static int raster_width = RASTER_WIDTH, raster_height = RASTER_HEIGHT;
 
 int debug_mode = 0;
 
+solar_system_t solar_system;
+
 void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     raster_width = width;
     raster_height = height;
-
 
     printf("Initializing rasters with width: %d, height: %d\n", raster_width, raster_height);
 
@@ -34,6 +35,7 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     rafgl_raster_init(&raster2, raster_width, raster_height);
 
     perlin_raster = generate_perlin(8, 0.7);
+    solar_system = generate_solar_system(8, sun_radius, sun_x, sun_y, perlin_raster);
 
     rafgl_texture_init(&texture);
     generate_starfield(raster, 1000);
@@ -53,10 +55,14 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
 
 
     draw_realistic_sun(raster, sun_x, sun_y, sun_radius);
+    rafgl_pixel_rgb_t color_white = {255, 255, 255};
+    draw_ellipse(raster, sun_x, sun_y, 100, 50, color_white);
+    for (int i = 0; i < solar_system.num_bodies; i++) {
+        cosmic_body_t *planet = &solar_system.planets[i];
+        draw_ellipse(raster, planet->orbit_center_x, planet->orbit_center_y, planet->orbit_radius_x, planet->orbit_radius_y, color_white);
+    }
 
     // draw_realistic_sun_with_texture(raster, sun_x, sun_y, sun_radius, perlin_raster, 0.1);
-
-
 
     // for (int i = 0; i < raster_width; i++) {
     //     yn = 1.0 * i / raster_height;

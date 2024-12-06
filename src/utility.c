@@ -182,3 +182,56 @@ rafgl_raster_t generate_animated_perlin(int octaves, double persistence, double 
     return raster;
 }
 
+void draw_ellipse(rafgl_raster_t raster, int xc, int yc, int rx, int ry, rafgl_pixel_rgb_t color) {
+    int x, y;
+    float rx2 = rx * rx;  // Square of radius along x-axis
+    float ry2 = ry * ry;  // Square of radius along y-axis
+    float two_rx2 = 2 * rx2;
+    float two_ry2 = 2 * ry2;
+
+    // Region 1
+    float p1 = ry2 - (rx2 * ry) + (0.25 * rx2);
+    x = 0;
+    y = ry;
+    int px = 0;
+    int py = two_rx2 * y;
+
+    while (px < py) {
+        // Draw pixels for this point
+        pixel_at_m(raster, xc + x, yc + y) = color;
+        pixel_at_m(raster, xc - x, yc + y) = color;
+        pixel_at_m(raster, xc + x, yc - y) = color;
+        pixel_at_m(raster, xc - x, yc - y) = color;
+
+        x++;
+        px += two_ry2;
+        if (p1 < 0) {
+            p1 += ry2 + px;
+        } else {
+            y--;
+            py -= two_rx2;
+            p1 += ry2 + px - py;
+        }
+    }
+
+    // Region 2
+    float p2 = (ry2) * (x + 0.5) * (x + 0.5) + (rx2) * (y - 1) * (y - 1) - (rx2 * ry2);
+
+    while (y > 0) {
+        // Draw pixels for this point
+        pixel_at_m(raster, xc + x, yc + y) = color;
+        pixel_at_m(raster, xc - x, yc + y) = color;
+        pixel_at_m(raster, xc + x, yc - y) = color;
+        pixel_at_m(raster, xc - x, yc - y) = color;
+
+        y--;
+        py -= two_rx2;
+        if (p2 > 0) {
+            p2 += rx2 - py;
+        } else {
+            x++;
+            px += two_ry2;
+            p2 += rx2 - py + px;
+        }
+    }
+}
