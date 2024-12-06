@@ -37,11 +37,11 @@ void draw_realistic_sun(rafgl_raster_t raster, int x, int y, int radius);
 
 void draw_realistic_sun_with_texture(rafgl_raster_t raster, int x, int y, int radius, rafgl_raster_t sun_texture, double smooth_factor);
 
-void generate_starfield(rafgl_raster_t raster, int num_stars);
-
-void draw_a_star(rafgl_raster_t raster, int x, int y, int radius);
+void scatter_stars(rafgl_raster_t raster, int num_stars);
 
 solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x, int sun_y, rafgl_raster_t sun_texture);
+
+void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixel_rgb_t bg_color, int num_stars);
 
 #endif //COSMIC_BODIES_H
 

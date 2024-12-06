@@ -235,3 +235,73 @@ void draw_ellipse(rafgl_raster_t raster, int xc, int yc, int rx, int ry, rafgl_p
         }
     }
 }
+
+double radial_gradient(int x, int y, int center_x, int center_y, int width, int height) {
+    double dx = (double)(x - center_x) / (width / 2);
+    double dy = (double)(y - center_y) / (height / 2);
+    return 1.0 - sqrt(dx * dx + dy * dy);
+}
+
+rafgl_pixel_rgb_t map_to_color(double value) {
+    value = fmax(0.0, fmin(1.0, value));
+
+    // purple -> blue -> white -> yellow
+
+    double darkness_factor = 0.1;
+
+    if (value < 0.25) return (rafgl_pixel_rgb_t){value * 255 * darkness_factor, 0, 255 * darkness_factor};              // Purple
+    if (value < 0.5) return (rafgl_pixel_rgb_t){0, value * 255 * darkness_factor, 255 * darkness_factor};               // Blue
+    if (value < 0.75) return (rafgl_pixel_rgb_t){value * 255 * darkness_factor, value * 255 * darkness_factor, 255 * darkness_factor};    // White
+
+    return (rafgl_pixel_rgb_t){255 * darkness_factor, value * 255 * darkness_factor, value * 200 * darkness_factor};                      // Yellow
+}
+
+rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, double persistence) {
+    srand(time(NULL));
+
+    rafgl_raster_t raster;
+    rafgl_raster_init(&raster, width, height);
+
+    double *noise_map = calloc(width * height, sizeof(double));
+    double *temp_map = malloc(width * height * sizeof(double));
+
+    int center_x = width / 2;
+    int center_y = height / 2;
+
+    double max_intensity = 0.0;
+
+    // Generate Perlin noise with multiple octaves
+    for (int octave = 0; octave < octaves; octave++) {
+        int octave_size = pow(2, octave + 2);
+        double amplitude = pow(persistence, octave);
+
+        for (int y = 0; y < octave_size; y++) {
+            for (int x = 0; x < octave_size; x++) {
+                temp_map[y * octave_size + x] = (1.0 + randf()) * 2.0 - 1.0;
+            }
+        }
+
+        cosine_map_rescale(noise_map, width, height, temp_map, octave_size, octave_size);
+
+        for (int i = 0; i < width * height; i++) {
+            noise_map[i] += temp_map[i] * amplitude;
+            max_intensity = fmax(max_intensity, noise_map[i]);
+        }
+    }
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            double radial = radial_gradient(x, y, center_x, center_y, width, height);
+            double noise_value = noise_map[y * width + x] / max_intensity;
+
+            double final_value = noise_value * radial;
+
+            pixel_at_m(raster, x, y) = map_to_color(final_value);
+        }
+    }
+
+    free(noise_map);
+    free(temp_map);
+
+    return raster;
+}

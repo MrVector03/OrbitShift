@@ -17,4 +17,6 @@ void map_multiply_and_add(double *dst, double *src, int w, int h, double multipl
 
 void draw_ellipse(rafgl_raster_t raster, int xc, int yc, int rx, int ry, rafgl_pixel_rgb_t color);
 
+rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, double persistence);
+
 #endif //UTILITY_H

@@ -2,6 +2,7 @@
 #include <rafgl.h>
 #include <game_constants.h>
 #include <time.h>
+#include <utility.h>
 
 // CONSTANTS
 
@@ -24,10 +25,10 @@ void draw_realistic_sun(rafgl_raster_t raster, int x, int y, int radius) {
             {
                 pixel_at_m(raster, i, j) = sun_color;
             }
-            else
-            {
-                pixel_at_m(raster, i, j) = sky_color;
-            }
+            // else
+            // {
+            //     pixel_at_m(raster, i, j) = sky_color;
+            // }
         }
     }
 }
@@ -98,26 +99,12 @@ void draw_realistic_sun_with_texture(rafgl_raster_t raster, int x, int y, int ra
     }
 }
 
-void draw_a_star(rafgl_raster_t raster, int x, int y, int radius) {
-    for (int i = 0; i < RASTER_WIDTH; i++) {
-        for (int j = 0; j < RASTER_HEIGHT; j++) {
-            float dx = i - x;
-            float dy = j - y;
-            float distance = sqrt(dx * dx + dy * dy);
-
-            if (distance < radius)
-            {
-                pixel_at_m(raster, i, j).rgba = rafgl_RGB(255, 255, 255);
-            }
-        }
-    }
-}
-
-void generate_starfield(rafgl_raster_t raster, int num_stars) {
+void scatter_stars(rafgl_raster_t raster, int num_stars) {
     for (int i = 0; i < num_stars; i++) {
         int x = rand() % RASTER_WIDTH;
         int y = rand() % RASTER_HEIGHT;
-        pixel_at_m(raster, x, y).rgba = rafgl_RGB(255, 255, 255);
+        rafgl_pixel_rgb_t star_color = {255, 255, 255};
+        pixel_at_m(raster, x, y) = star_color;
     }
 }
 
@@ -145,3 +132,15 @@ solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x,
 
     return solar_system;
 }
+
+void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixel_rgb_t bg_color, int num_stars) {
+    for (int i = 0; i < RASTER_WIDTH; i++) {
+        for (int j = 0; j < RASTER_HEIGHT; j++) {
+            pixel_at_m(raster, i, j) = pixel_at_m(background, i, j);
+        }
+    }
+
+    scatter_stars(raster, num_stars);
+}
+
+
