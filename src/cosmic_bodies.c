@@ -5,9 +5,8 @@
 #include <utility.h>
 
 // CONSTANTS
-
 const rafgl_pixel_rgb_t sun_color = { {214, 75, 15} };
-const double sun_surface_noise_factor = 0.001;
+const double sun_surface_noise_factor = 0.01;
 const rafgl_pixel_rgb_t sky_color = { {3, 4, 15} };
 
 
@@ -22,16 +21,42 @@ void draw_realistic_sun(rafgl_raster_t raster, int x, int y, int radius) {
             double noise = (rand() % 100) / 100.0 * sun_surface_noise_factor;
 
             if (distance < radius * (1 + noise))
-            {
                 pixel_at_m(raster, i, j) = sun_color;
-            }
-            // else
-            // {
-            //     pixel_at_m(raster, i, j) = sky_color;
-            // }
         }
     }
 }
+
+void render_planets(rafgl_raster_t raster, solar_system_t *solar_system) {
+    for (int i = 0; i < raster.width; i++) {
+        for (int j = 0; j < raster.height; j++) {
+            for (int k = 0; k < solar_system->num_bodies; k++) {
+                cosmic_body_t *planet = &solar_system->planets[k];
+                float dx = i - planet->current_x;
+                float dy = j - planet->current_y;
+                float distance = sqrt(dx * dx + dy * dy);
+                double noise = (rand() % 100) / 100.0 * sun_surface_noise_factor;
+
+
+                if (planet->is_center) {
+                    if (distance < planet->radius * (1 + noise))
+                        pixel_at_m(raster, i, j) = sun_color;
+                } else if (distance < planet->radius) {
+                    pixel_at_m(raster, i, j) = pixel_at_m(planet->texture, i % planet->texture.height, j % planet->texture.width);
+                }
+            }
+        }
+    }
+    for (int i = 0; i < solar_system->num_bodies; i++) {
+        if (!solar_system->planets[i].is_center) {
+            update_ellipsoid_path_point(&solar_system->planets[i].current_x, &solar_system->planets[i].current_y,
+                solar_system->planets[i].orbit_center_x, solar_system->planets[i].orbit_center_y,
+                solar_system->planets[i].orbit_radius_x, solar_system->planets[i].orbit_radius_y,
+                &solar_system->planets[i].theta, 0.01, solar_system->planets[i].orbit_speed, solar_system->planets[i].orbit_direction);
+        }
+    }
+
+}
+
 
 double previous_noise = 0.0;
 
@@ -65,18 +90,13 @@ void draw_realistic_sun_with_texture(rafgl_raster_t raster, int x, int y, int ra
             float dy = j - y;
             float distance = sqrt(dx * dx + dy * dy);
 
-            // Generate new random noise for the sun's surface
             double current_noise = (rand() % 100) / 100.0 * sun_surface_noise_factor;
 
-            // Apply smoothing to the noise
             double smooth_noise_value = smooth_noise(current_noise, smooth_factor);
 
-            // Update the previous noise value for the next frame
             previous_noise = smooth_noise_value;
 
-            // Apply the noise to simulate the sun's surface
             if (distance < radius * (1 + smooth_noise_value)) {
-                // Map the noise value to a color
                 rafgl_pixel_rgb_t sun_color = map_noise_to_sun_color(smooth_noise_value);
 
                 int tex_x = (int)((dx / radius + 1) * 0.5 * texture_width);
@@ -85,7 +105,6 @@ void draw_realistic_sun_with_texture(rafgl_raster_t raster, int x, int y, int ra
                 tex_x = (tex_x < 0) ? 0 : (tex_x >= texture_width) ? texture_width - 1 : tex_x;
                 tex_y = (tex_y < 0) ? 0 : (tex_y >= texture_height) ? texture_height - 1 : tex_y;
 
-                // Add the texture color to the sun's color
                 rafgl_pixel_rgb_t texture_color = pixel_at_m(sun_texture, tex_x, tex_y);
                 sun_color.r = (sun_color.r + texture_color.r) / 2; // Blend the colors
                 sun_color.g = (sun_color.g + texture_color.g) / 2;
@@ -93,7 +112,7 @@ void draw_realistic_sun_with_texture(rafgl_raster_t raster, int x, int y, int ra
 
                 pixel_at_m(raster, i, j) = sun_color;
             } else {
-                pixel_at_m(raster, i, j) = sky_color;  // Sky color
+                pixel_at_m(raster, i, j) = sky_color;
             }
         }
     }
@@ -113,21 +132,35 @@ solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x,
     int curr_orbit_radius_y = 100;
 
     solar_system_t solar_system;
-    solar_system.sun = (cosmic_body_t){sun_x, sun_y, sun_radius, 1, sun_texture, sun_x, sun_y, curr_orbit_radius_x, curr_orbit_radius_y};
-    solar_system.num_bodies = num_planets;
-    srand(time(NULL));
+    cosmic_body_t sun = {sun_x, sun_y, sun_radius, 1, sun_texture, sun_x, sun_y, curr_orbit_radius_x, curr_orbit_radius_y};
+    solar_system.sun = sun;
+    solar_system.num_bodies = num_planets + 1;
+    solar_system.planets[0] = sun;
 
-    for (int i = 0; i < num_planets; i++) {
+    for (int i = 1; i <= num_planets; i++) {
         cosmic_body_t planet;
         planet.orbit_center_x = sun_x;
         planet.orbit_center_y = sun_y;
         planet.orbit_radius_x = curr_orbit_radius_x;
         planet.orbit_radius_y = curr_orbit_radius_y;
 
+        planet.current_x = sun_x;
+        planet.current_y = sun_y + curr_orbit_radius_y;
+
+        planet.radius = rand() % 20 + 10;
+        planet.is_center = 0;
+        planet.texture = generate_perlin(8, 0.7);
+
+        printf("RAND: %d\n", rand());
+
+        planet.orbit_speed = (rand() * i) % 10 + 3;
+        planet.orbit_direction = ((rand() + i) % 2) ? 1 : -1;
+        planet.theta = 0.0;
+
         solar_system.planets[i] = planet;
 
-        curr_orbit_radius_x += rand() % 100 + 50;
-        curr_orbit_radius_y += rand() % 50 + 25;
+        curr_orbit_radius_x += rand() % 100 + planet.radius + 25;
+        curr_orbit_radius_y += rand() % 50 + planet.radius + 15;
     }
 
     return solar_system;

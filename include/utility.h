@@ -19,4 +19,6 @@ void draw_ellipse(rafgl_raster_t raster, int xc, int yc, int rx, int ry, rafgl_p
 
 rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, double persistence);
 
+void update_ellipsoid_path_point(float *x, float *y, float cx, float cy, float a, float b, float *theta, float delta_time, float speed, int direction);
+
 #endif //UTILITY_H

@@ -123,7 +123,7 @@ rafgl_raster_t generate_perlin(int octaves, double persistence) {
 }
 
 rafgl_raster_t generate_animated_perlin(int octaves, double persistence, double p_time) {
-    srand(time(NULL));
+    //srand(time(NULL));
 
     int octave_size = 2;
     double multiplier = 1.0;
@@ -257,7 +257,7 @@ rafgl_pixel_rgb_t map_to_color(double value) {
 }
 
 rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, double persistence) {
-    srand(time(NULL));
+    //srand(time(NULL));
 
     rafgl_raster_t raster;
     rafgl_raster_init(&raster, width, height);
@@ -304,4 +304,17 @@ rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, doubl
     free(temp_map);
 
     return raster;
+}
+
+void update_ellipsoid_path_point(float *x, float *y, float cx, float cy, float a, float b, float *theta, float delta_time, float speed, int direction) {
+    *theta += delta_time * speed * direction;
+
+    if (*theta > 2 * M_PI) {
+        *theta -= 2 * M_PI;
+    } else if (*theta < 0) {
+        *theta += 2 * M_PI;
+    }
+
+    *x = cx + a * cos(*theta);
+    *y = cy + b * sin(*theta);
 }
