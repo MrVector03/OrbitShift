@@ -19,6 +19,8 @@ typedef struct {
     int orbit_center_y;
     double orbit_radius_x;
     double orbit_radius_y;
+    int initial_x;
+    int initial_y;
 
     int orbit_speed;
     int orbit_direction; /// 1 - clockwise, -1 - counterclockwise
@@ -30,6 +32,12 @@ typedef struct {
     cosmic_body_t planets[32];
     int num_bodies;
 } solar_system_t;
+
+typedef struct {
+    double curr_x, curr_y;
+    double angle;
+    double speed;
+} spaceship;
 
 extern const rafgl_pixel_rgb_t sun_color;
 
@@ -48,6 +56,12 @@ solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x,
 void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixel_rgb_t bg_color, int num_stars);
 
 void render_planets(rafgl_raster_t raster, solar_system_t *solar_system);
+
+void draw_rocket(rafgl_raster_t raster, spaceship *ship);
+
+void move_rocket(spaceship *ship, float thrust, float angle_control, float delta_time);
+
+spaceship init_spaceship(float x, float y, float angle, float speed);
 
 #endif //COSMIC_BODIES_H
 

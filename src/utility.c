@@ -318,3 +318,75 @@ void update_ellipsoid_path_point(float *x, float *y, float cx, float cy, float a
     *x = cx + a * cos(*theta);
     *y = cy + b * sin(*theta);
 }
+
+rafgl_raster_t generate_perlin_with_color(int octaves, double persistence) {
+    srand(time(NULL));
+
+    int octave_size = 2;
+    double multiplier = 1.0;
+    rafgl_raster_t raster;
+
+    int width = RASTER_WIDTH;  // You can adjust the width/height size as needed
+    int height = RASTER_HEIGHT;
+
+    int x, y, octave;
+    double *tmp_map = malloc(height * width * sizeof(double));
+    double *perlin_map = calloc(height * width, sizeof(double));
+    double *octave_map;
+    rafgl_pixel_rgb_t pix;
+    rafgl_raster_init(&raster, width, height);
+
+    // Generate Perlin noise with octaves
+    for (octave = 0; octave < octaves; octave++) {
+        octave_map = malloc(octave_size * octave_size * sizeof(double));
+
+        for (y = 0; y < octave_size; y++) {
+            for (x = 0; x < octave_size; x++) {
+                octave_map[y * octave_size + x] = (1.0 + randf()) * 2.0 - 1.0;
+            }
+        }
+
+        cosine_map_rescale(tmp_map, width, height, octave_map, octave_size, octave_size);
+        map_multiply_and_add(perlin_map, tmp_map, width, height, multiplier);
+
+        octave_size *= 2;
+        multiplier *= persistence;
+        memset(tmp_map, 0, height * width * sizeof(double));
+        free(octave_map);
+    }
+
+    // Color map and texture generation
+    float sample;
+    for (y = 0; y < height; y++) {
+        for (x = 0; x < width; x++) {
+            sample = perlin_map[y * width + x];
+            sample = (sample + 1.0) / 2.0;  // Normalize between 0 and 1
+
+            // Color mapping (Blue -> Green -> Yellow -> Red)
+            if (sample < 0.25) {
+                pix.r = 0;
+                pix.g = sample * 255 * 4;
+                pix.b = 255;
+            } else if (sample < 0.5) {
+                pix.r = 0;
+                pix.g = 255;
+                pix.b = 255 - (sample - 0.25) * 255 * 2;
+            } else if (sample < 0.75) {
+                pix.r = (sample - 0.5) * 255 * 2;
+                pix.g = 255 - (sample - 0.5) * 255 * 2;
+                pix.b = 0;
+            } else {
+                pix.r = 255;
+                pix.g = 255 - (sample - 0.75) * 255 * 4;
+                pix.b = 0;
+            }
+
+            pixel_at_m(raster, x, y) = pix;
+        }
+    }
+
+    free(perlin_map);
+    free(tmp_map);
+
+    return raster;
+}

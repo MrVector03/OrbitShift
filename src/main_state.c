@@ -24,6 +24,7 @@ static int raster_width = RASTER_WIDTH, raster_height = RASTER_HEIGHT;
 int debug_mode = 0;
 
 solar_system_t solar_system;
+spaceship rocket;
 
 void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     raster_width = width;
@@ -38,9 +39,12 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     /// generating
     perlin_raster = generate_perlin(8, 0.7);
     galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05);
+    //galaxy_texture = generate_perlin_with_color(8, 0.7);
     solar_system = generate_solar_system(1, sun_radius, sun_x, sun_y, perlin_raster);
 
     rafgl_texture_init(&texture);
+
+    rocket = init_spaceship(sun_x, sun_y + sun_radius, 0.0, 0.0);
 
     set_background(background_raster, galaxy_texture, sky_color, 1000);
 
@@ -57,8 +61,6 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
 
     memcpy(raster.data, background_raster.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
 
-    //draw_realistic_sun(raster, sun_x, sun_y, sun_radius);
-    //scatter_stars(raster, 1000);
     rafgl_pixel_rgb_t color_white = {255, 255, 255};
     for (int i = 0; i < solar_system.num_bodies; i++) {
         draw_ellipse(raster, solar_system.planets[i].orbit_center_x,
@@ -69,7 +71,21 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
     }
     render_planets(raster, &solar_system);
 
+    if (game_data->keys_down[GLFW_KEY_W]) {
+        move_rocket(&rocket, 0.1, 0.0, delta_time);
+    }
+    if (game_data->keys_down[GLFW_KEY_A]) {
+        move_rocket(&rocket, 0.0, -0.1, delta_time);
+    }
+    if (game_data->keys_down[GLFW_KEY_S]) {
+        move_rocket(&rocket, -0.1, 0.0, delta_time);
+    }
+    if (game_data->keys_down[GLFW_KEY_D]) {
+        move_rocket(&rocket, 0.0, 0.1, delta_time);
+    }
 
+    move_rocket(&rocket, 0.0, 0.0, delta_time);
+    draw_rocket(raster, &rocket);
 }
 
 

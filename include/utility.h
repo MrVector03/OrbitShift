@@ -21,4 +21,6 @@ rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, doubl
 
 void update_ellipsoid_path_point(float *x, float *y, float cx, float cy, float a, float b, float *theta, float delta_time, float speed, int direction);
 
+rafgl_raster_t generate_perlin_with_color(int octaves, double persistence);
+
 #endif //UTILITY_H

@@ -41,7 +41,7 @@ void render_planets(rafgl_raster_t raster, solar_system_t *solar_system) {
                     if (distance < planet->radius * (1 + noise))
                         pixel_at_m(raster, i, j) = sun_color;
                 } else if (distance < planet->radius) {
-                    pixel_at_m(raster, i, j) = pixel_at_m(planet->texture, i % planet->texture.height, j % planet->texture.width);
+                    pixel_at_m(raster, i, j) = pixel_at_m(planet->texture, planet->initial_x, planet->initial_y);
                 }
             }
         }
@@ -54,7 +54,6 @@ void render_planets(rafgl_raster_t raster, solar_system_t *solar_system) {
                 &solar_system->planets[i].theta, 0.01, solar_system->planets[i].orbit_speed, solar_system->planets[i].orbit_direction);
         }
     }
-
 }
 
 
@@ -141,15 +140,19 @@ solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x,
         cosmic_body_t planet;
         planet.orbit_center_x = sun_x;
         planet.orbit_center_y = sun_y;
+
         planet.orbit_radius_x = curr_orbit_radius_x;
         planet.orbit_radius_y = curr_orbit_radius_y;
 
         planet.current_x = sun_x;
         planet.current_y = sun_y + curr_orbit_radius_y;
 
+        planet.initial_x = sun_x;
+        planet.initial_y = sun_y + curr_orbit_radius_y;
+
         planet.radius = rand() % 20 + 10;
         planet.is_center = 0;
-        planet.texture = generate_perlin(8, 0.7);
+        planet.texture = generate_perlin_with_color(8, 0.7);
 
         printf("RAND: %d\n", rand());
 
@@ -176,4 +179,90 @@ void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixe
     scatter_stars(raster, num_stars);
 }
 
+void fill_triangle(rafgl_raster_t raster, int x1, int y1, int x2, int y2, int x3, int y3, rafgl_pixel_rgb_t *color) {
+    if (y1 > y2) {
+        int tmp = y1; y1 = y2; y2 = tmp;
+        tmp = x1; x1 = x2; x2 = tmp;
+    }
 
+    if (y2 > y3) {
+        int tmp = y2; y2 = y3; y3 = tmp;
+        tmp = x2; x2 = x3; x3 = tmp;
+    }
+
+    if (y1 > y2) {
+        int tmp = y1; y1 = y2; y2 = tmp;
+        tmp = x1; x1 = x2; x2 = tmp;
+    }
+
+    float m1 = (float)(x2 - x1) / (y2 - y1);
+    float m2 = (float)(x3 - x1) / (y3 - y1);
+    float m3 = (float)(x3 - x2) / (y3 - y2);
+
+    float startX1 = x1, startX2 = x1;
+    for (int y = y1; y <= y2; y++) {
+        rafgl_raster_draw_line(&raster, (int)startX1, y, (int)startX2, y, color);
+        startX1 += m1;
+        startX2 += m2;
+    }
+
+    startX1 = x2;
+    startX2 = x1;
+    for (int y = y2; y <= y3; y++) {
+        rafgl_raster_draw_line(&raster, (int)startX1, y, (int)startX2, y, color);
+        startX1 += m3;
+        startX2 += m2;
+    }
+}
+
+
+void draw_rocket(rafgl_raster_t raster, spaceship *ship) {
+    int width = raster.width;
+    int height = raster.height;
+
+    double size = 20.0;
+    double pointiness_factor = 2.5;
+    double x1, y1, x2, y2, x3, y3;
+
+    double front_size = size * pointiness_factor;
+
+    x2 = ship->curr_x + front_size * cos(ship->angle);
+    y2 = ship->curr_y + front_size * sin(ship->angle);
+
+    x3 = ship->curr_x + size * cos(ship->angle + M_PI / 3);
+    y3 = ship->curr_y + size * sin(ship->angle + M_PI / 3);
+
+    x1 = ship->curr_x + size * cos(ship->angle - M_PI / 3);
+    y1 = ship->curr_y + size * sin(ship->angle - M_PI / 3);
+
+    rafgl_pixel_rgb_t rgb = {255, 255, 255};
+
+    //fill_triangle(raster, (int)x1, (int)y1, (int)x2, (int)y2, (int)x3, (int)y3, &rgb);
+
+    rafgl_raster_draw_line(&raster, (int)x1, (int)y1, (int)x2, (int)y2, &rgb);
+    rafgl_raster_draw_line(&raster, (int)x2, (int)y2, (int)x3, (int)y3, &rgb);
+    rafgl_raster_draw_line(&raster, (int)x3, (int)y3, (int)x1, (int)y1, &rgb);
+}
+
+void move_rocket(spaceship *ship, float thrust, float angle_control, float delta_time) {
+    ship->curr_x += delta_time * ship->speed * cos(ship->angle);
+    ship->curr_y += delta_time * ship->speed * sin(ship->angle);
+
+    if (thrust) {
+        ship->speed += thrust;
+    }
+
+    if (angle_control) {
+        ship->angle += angle_control;
+    }
+}
+
+spaceship init_spaceship(float x, float y, float angle, float speed) {
+    spaceship ship;
+    ship.curr_x = x;
+    ship.curr_y = y;
+    ship.angle = angle;
+    ship.speed = speed;
+
+    return ship;
+}
