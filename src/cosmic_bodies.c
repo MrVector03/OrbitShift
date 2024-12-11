@@ -9,6 +9,11 @@ const rafgl_pixel_rgb_t sun_color = { {214, 75, 15} };
 const double sun_surface_noise_factor = 0.01;
 const rafgl_pixel_rgb_t sky_color = { {3, 4, 15} };
 
+static spaceship* rocket;
+
+void link_rocket(spaceship* ship) {
+    rocket = ship;
+}
 
 void draw_realistic_sun(rafgl_raster_t raster, int x, int y, int radius) {
     for (int i = 0; i < RASTER_WIDTH; i++) {
@@ -26,7 +31,58 @@ void draw_realistic_sun(rafgl_raster_t raster, int x, int y, int radius) {
     }
 }
 
+float vignette_strength(float distance_to_sun, float max_effect_distance, float max_intensity) {
+    if (distance_to_sun > max_effect_distance) {
+        return 0.0f; // No vignette effect outside the range
+    }
+    return max_intensity * (1.0f - (distance_to_sun / max_effect_distance));
+}
+
+
+// void apply_vignette_with_tint(rafgl_raster_t *raster, rafgl_pixel_rgb_t tint_color) {
+//     float dist, vignette_factor = 1.5, r = 350;
+//     rafgl_pixel_rgb_t sampled, result;
+//     float cx = raster->width / 2;
+//     float cy = raster->height / 2;
+//     int x = rocket->curr_x;
+//     int y = rocket->curr_y;
+//
+//
+//     // Iterate through each pixel of the raster
+//     for (int i = 0; i < raster->width; i++) {
+//         for (int j = 0; j < raster->height; j++) {
+//
+//             sampled = tint_color;
+//
+//             dist = rafgl_distance2D(cx,cy, x,y)/r;
+//             dist = powf(dist, 1.8f);
+//
+//             //imamo oduzimanje, jer zelimo da potamnimo sliku kako se udaljavamo
+//             //tj da umanjimo brightness, da smo hteli da nam je sve svetlije ka krajevima
+//             //stavili bismo samo + umesto -
+//             result.r = rafgl_saturatei(sampled.r *(1.0f - dist*vignette_factor));
+//             result.g = rafgl_saturatei(sampled.g *(1.0f - dist*vignette_factor));
+//             result.b = rafgl_saturatei(sampled.b *(1.0f - dist*vignette_factor));
+//
+//             pixel_at_m(raster, x, y) = result;
+//         }
+//     }
+// }
+//
+
+
 void render_planets(rafgl_raster_t raster, solar_system_t *solar_system) {
+    float dx, dy, distance;
+    float distance_fs = sqrt(pow(rocket->curr_x - solar_system->sun.current_x, 2) + pow(rocket->curr_y - solar_system->sun.current_y, 2));
+    rafgl_pixel_rgb_t result;
+
+    float dist, vignette_factor = 1.5, vignette_scale_factor = 0.5;
+    rafgl_pixel_rgb_t sampled;
+    float cx = raster.width / 2;
+    float cy = raster.height / 2;
+    float rocket_dist = rafgl_distance2D(solar_system->sun.current_x, solar_system->sun.current_y, rocket->curr_x, rocket->curr_y);
+    float r = 550.0 + rocket_dist * vignette_scale_factor;
+
     for (int i = 0; i < raster.width; i++) {
         for (int j = 0; j < raster.height; j++) {
             for (int k = 0; k < solar_system->num_bodies; k++) {
@@ -46,12 +102,33 @@ void render_planets(rafgl_raster_t raster, solar_system_t *solar_system) {
             }
         }
     }
+
+    // for (int i = 0; i < raster.width; i++) {
+    //     for (int j = 0; j < raster.height; j++) {
+    //         // Distance from rocket to sun (for vignette effect)
+    //         distance_fs = rafgl_distance2D(solar_system->sun.current_x, solar_system->sun.current_y, rocket->curr_x, rocket->curr_y);
+    //         vignette_factor = vignette_strength(distance_fs, 500.0f, 1.5f);
+    //
+    //         // Apply vignette to sun
+    //         rafgl_raster_t sun_color = solar_system->sun.texture;
+    //         rafgl_pixel_rgb_t sun_pixel = pixel_at_m(sun_color, solar_system->sun.initial_x, solar_system->sun.initial_y);
+    //
+    //         // Apply vignette effect to sun color
+    //         result.r = rafgl_saturatei(sun_pixel.r * (1.0 - distance_fs * vignette_factor));
+    //         result.g = rafgl_saturatei(sun_pixel.g * (1.0 - distance_fs * vignette_factor));
+    //         result.b = rafgl_saturatei(sun_pixel.b * (1.0 - distance_fs * vignette_factor));
+    //
+    //         // Assign vignette-adjusted color back to the pixel
+    //         pixel_at_m(raster, i, j) = result;
+    //     }
+    // }
+
     for (int i = 0; i < solar_system->num_bodies; i++) {
         if (!solar_system->planets[i].is_center) {
             update_ellipsoid_path_point(&solar_system->planets[i].current_x, &solar_system->planets[i].current_y,
                 solar_system->planets[i].orbit_center_x, solar_system->planets[i].orbit_center_y,
                 solar_system->planets[i].orbit_radius_x, solar_system->planets[i].orbit_radius_y,
-                &solar_system->planets[i].theta, 0.01, solar_system->planets[i].orbit_speed, solar_system->planets[i].orbit_direction);
+                &solar_system->planets[i].theta, (rand() % i+1) * 0.1, solar_system->planets[i].orbit_speed, solar_system->planets[i].orbit_direction);
         }
     }
 }
@@ -152,11 +229,11 @@ solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x,
 
         planet.radius = rand() % 20 + 10;
         planet.is_center = 0;
-        planet.texture = generate_perlin_with_color(8, 0.7);
+        planet.texture = generate_perlin_with_color(3, 0.7);
 
         printf("RAND: %d\n", rand());
 
-        planet.orbit_speed = (rand() * i) % 10 + 3;
+        planet.orbit_speed = ((rand() % 100) / 1000.0) * (1.0 / i);
         planet.orbit_direction = ((rand() + i) % 2) ? 1 : -1;
         planet.theta = 0.0;
 

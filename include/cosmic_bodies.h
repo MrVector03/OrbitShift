@@ -22,7 +22,7 @@ typedef struct {
     int initial_x;
     int initial_y;
 
-    int orbit_speed;
+    double orbit_speed;
     int orbit_direction; /// 1 - clockwise, -1 - counterclockwise
     float theta;
 } cosmic_body_t;
@@ -62,6 +62,10 @@ void draw_rocket(rafgl_raster_t raster, spaceship *ship);
 void move_rocket(spaceship *ship, float thrust, float angle_control, float delta_time);
 
 spaceship init_spaceship(float x, float y, float angle, float speed);
+
+void link_rocket(spaceship* ship);
+
+void apply_vignette_with_tint(rafgl_raster_t raster, rafgl_pixel_rgb_t tint_color);
 
 #endif //COSMIC_BODIES_H
 
