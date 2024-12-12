@@ -32,11 +32,16 @@ rafgl_pixel_rgb_t color_sun = {255, 255, 0};
 
 rafgl_raster_t vignetted_raster;
 
+/// FPS CONTROL CENTER
+
+int num_planets = 0;
+
+
 void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     //printf("Renderer: %s\n", glGetString(GL_RENDERER));
     //printf("Version: %s\n", glGetString(GL_VERSION));
 
-    int num_planets = 2;
+
     //scanf("%d", &num_planets);
 
     raster_width = width;
@@ -74,9 +79,6 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
             solar_system.planets[i].orbit_radius_y,
             color_white);
     }
-
-
-
 }
 
 void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *game_data, void *args) {
@@ -95,7 +97,7 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
     float cx = raster.width / 2;
     float cy = raster.height / 2;
     float rocket_dist = rafgl_distance2D(solar_system.sun.current_x, solar_system.sun.current_y, rocket.curr_x, rocket.curr_y);
-    float r = 550.0 + rocket_dist * vignette_scale_factor;
+    float r = 750.0 + rocket_dist * vignette_scale_factor;
 
     float orange_r = 1.0;
     float orange_g = 0.5;
@@ -105,36 +107,6 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
 
     render_planets(raster, &solar_system);
 
-    // === FPS SHITS THE BED ===
-
-    // for (int i = 0; i < raster.width; i++) {
-    //     for (int j = 0; j < raster.height; j++) {
-    //         dist = rafgl_distance2D(i, j, cx, cy) / r;
-    //
-    //         // Apply a power function to make the vignette effect more pronounced on the edges
-    //         dist = powf(dist, 1.8f); // You can adjust this exponent to control the softness of the vignette
-    //
-    //         // Sample the current pixel color (e.g., from the background or previous frame)
-    //         sampled = pixel_at_m(raster, i, j);
-    //         //sampled = sun_color;
-    //
-    //         // Apply the vignette effect by darkening the pixel color toward the edges
-    //         result.r = rafgl_saturatei(sampled.r * (1.0f - dist * vignette_factor));
-    //         result.g = rafgl_saturatei(sampled.g * (1.0f - dist * vignette_factor));
-    //         result.b = rafgl_saturatei(sampled.b * (1.0f - dist * vignette_factor));
-    //
-    //         float tint_factor = dist * vignette_factor;
-    //
-    //         result.r = rafgl_saturatei(result.r + orange_r * tint_factor);
-    //         result.g = rafgl_saturatei(result.g + orange_g * tint_factor);
-    //         result.b = rafgl_saturatei(result.b + orange_b * tint_factor);
-    //
-    //         pixel_at_m(raster, i, j) = result;
-    //     }
-    // }
-
-    // memcpy(raster.data, vignetted_raster.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
-    //
     int moved = 0;
     if (game_data->keys_down[GLFW_KEY_W]) {
         move_rocket(&rocket, 0.7, 0.0, delta_time);
@@ -153,6 +125,37 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
 
     move_rocket(&rocket, 0.0, 0.0, delta_time);
     draw_rocket(raster, &rocket, smoke_spritesheet, delta_time, moved);
+
+    // TODO: Smoothly blend hot and normal vignettes
+    for (int i = 0; i < raster.width; i++) {
+        for (int j = 0; j < raster.height; j++) {
+            dist = rafgl_distance2D(i, j, cx, cy) / r;
+
+            // Apply a power function to make the vignette effect more pronounced on the edges
+            dist = powf(dist, 1.8f); // You can adjust this exponent to control the softness of the vignette
+
+            // Sample the current pixel color (e.g., from the background or previous frame)
+            sampled = pixel_at_m(raster, i, j);
+
+            float tint_factor = dist * vignette_factor;
+
+            if (rocket_dist < 150.0) {
+                // Closer to the sun, shrink and turn the vignette more orange
+                float proximity_factor = 1.0 - (rocket_dist / 500.0);
+                tint_factor *= proximity_factor;
+                result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor) + orange_r * tint_factor * 255);
+                result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor) + orange_g * tint_factor * 255);
+                result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor) + orange_b * tint_factor * 255);
+            } else {
+                // Far from the sun, keep the vignette black in the corners
+                result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor));
+                result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor));
+                result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor));
+            }
+
+            pixel_at_m(raster, i, j) = result;
+        }
+    }
 }
 
 
