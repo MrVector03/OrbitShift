@@ -4,12 +4,17 @@
 #include <time.h>
 #include <utility.h>
 
+#define MAX_SMOKE_PARTICLES 100
+
 // CONSTANTS
 const rafgl_pixel_rgb_t sun_color = { {214, 75, 15} };
 const double sun_surface_noise_factor = 0.01;
 const rafgl_pixel_rgb_t sky_color = { {3, 4, 15} };
 
 static spaceship* rocket;
+
+smoke_particle_t smoke_particles[MAX_SMOKE_PARTICLES];
+int active_smoke_particles = 0;
 
 void link_rocket(spaceship* ship) {
     rocket = ship;
@@ -292,12 +297,38 @@ void fill_triangle(rafgl_raster_t raster, int x1, int y1, int x2, int y2, int x3
     }
 }
 
+void spawn_smoke_particle(int x, int y, float lifespan, int frame) {
+    if (active_smoke_particles < MAX_SMOKE_PARTICLES) {
+        smoke_particles[active_smoke_particles++] = (smoke_particle_t){x, y, lifespan, frame};
+    }
+}
 
-void draw_rocket(rafgl_raster_t raster, spaceship *ship) {
+void update_smoke_particles(float delta_time) {
+    for (int i = 0; i < active_smoke_particles; i++) {
+        smoke_particles[i].smoke_lifespan -= delta_time;
+        if (smoke_particles[i].smoke_lifespan <= 0) {
+            smoke_particles[i] = smoke_particles[--active_smoke_particles];
+            i--;
+        }
+
+        /// SHIT HITS THE FAN (iz nekog razloga duva vetar u svemiru)
+        smoke_particles[i].pos_x += rand() % 3 + 2;
+        smoke_particles[i].pos_y += rand() % 3 - 2;
+    }
+}
+
+void draw_particles(rafgl_raster_t raster, rafgl_spritesheet_t spritesheet) {
+    for (int i = 0; i < active_smoke_particles; i++) {
+        smoke_particle_t *particle = &smoke_particles[i];
+        rafgl_raster_draw_spritesheet(&raster, &spritesheet, particle->frame, 1, particle->pos_x, particle->pos_y);
+    }
+}
+
+void draw_rocket(rafgl_raster_t raster, spaceship *ship, rafgl_spritesheet_t smoke_spritesheet, float delta_time, int moved) {
     int width = raster.width;
     int height = raster.height;
 
-    double size = 20.0;
+    double size = 10.0;
     double pointiness_factor = 2.5;
     double x1, y1, x2, y2, x3, y3;
 
@@ -319,6 +350,24 @@ void draw_rocket(rafgl_raster_t raster, spaceship *ship) {
     rafgl_raster_draw_line(&raster, (int)x1, (int)y1, (int)x2, (int)y2, &rgb);
     rafgl_raster_draw_line(&raster, (int)x2, (int)y2, (int)x3, (int)y3, &rgb);
     rafgl_raster_draw_line(&raster, (int)x3, (int)y3, (int)x1, (int)y1, &rgb);
+
+    /// Smoke trail
+    int exhaust_x = ship->curr_x - size * cos(ship->angle) + rand() % 10 - 5;
+    int exhaust_y = ship->curr_y - size * sin(ship->angle) + rand() % 10 - 5;
+
+
+    //printf("SHEET WIDTH %d\n", smoke_spritesheet.sheet_width);
+    //int frame = (ship->trail_timer * 10) % (smoke_spritesheet.sheet_width / SMOKE_SPRITE_WIDTH);
+    //rafgl_raster_draw_spritesheet(&raster, &smoke_spritesheet, ship->curr_particle, 1, exhaust_x, exhaust_y);
+    //printf("AFTER PRINT\n");
+
+    if (moved) {
+        int frame = rand() % 6;
+        spawn_smoke_particle(exhaust_x, exhaust_y, 5.0, frame);
+    }
+
+    update_smoke_particles(delta_time);
+    draw_particles(raster, smoke_spritesheet);
 }
 
 void move_rocket(spaceship *ship, float thrust, float angle_control, float delta_time) {
@@ -332,14 +381,19 @@ void move_rocket(spaceship *ship, float thrust, float angle_control, float delta
     if (angle_control) {
         ship->angle += angle_control;
     }
+
+    ship->trail_timer += delta_time;
+    ship->curr_particle = (ship->curr_particle + 1) % 6;
 }
 
-spaceship init_spaceship(float x, float y, float angle, float speed) {
+spaceship init_spaceship(float x, float y, float angle, float speed, int trail_timer) {
     spaceship ship;
     ship.curr_x = x;
     ship.curr_y = y;
     ship.angle = angle;
     ship.speed = speed;
-
+    ship.trail_timer = trail_timer;
+    ship.curr_particle = 0;
     return ship;
 }
+

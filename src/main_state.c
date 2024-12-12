@@ -12,6 +12,7 @@
 #include <utility.h>
 
 static rafgl_raster_t raster, raster2, perlin_raster, galaxy_texture, background_raster, handbrake_raster;
+static rafgl_spritesheet_t smoke_spritesheet;
 static rafgl_texture_t texture;
 
 
@@ -35,7 +36,7 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     //printf("Renderer: %s\n", glGetString(GL_RENDERER));
     //printf("Version: %s\n", glGetString(GL_VERSION));
 
-    int num_planets = 1;
+    int num_planets = 2;
     //scanf("%d", &num_planets);
 
     raster_width = width;
@@ -48,7 +49,8 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     rafgl_raster_load_from_image(&handbrake_raster, "res/images/handbrake.jpeg");
     rafgl_raster_init(&vignetted_raster, raster_width, raster_height);
     rafgl_raster_init(&background_raster, raster_width, raster_height);
-
+    rafgl_spritesheet_init(&smoke_spritesheet, "res/images/plumeplume.png", 6, 5);
+    //printf("HERE\n");
     /// generating
     perlin_raster = generate_perlin(8, 0.7);
     galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05);
@@ -58,7 +60,7 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     rafgl_texture_init(&texture);
 
 
-    rocket = init_spaceship(sun_x, sun_y + sun_radius, 0.0, 0.0);
+    rocket = init_spaceship(sun_x, sun_y + sun_radius, 0.0, 0., 10);
 
     link_rocket(&rocket);
 
@@ -133,21 +135,24 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
 
     // memcpy(raster.data, vignetted_raster.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
     //
+    int moved = 0;
     if (game_data->keys_down[GLFW_KEY_W]) {
         move_rocket(&rocket, 0.7, 0.0, delta_time);
+        moved = 1;
     }
     if (game_data->keys_down[GLFW_KEY_A]) {
         move_rocket(&rocket, 0.0, -0.1, delta_time);
     }
     if (game_data->keys_down[GLFW_KEY_S]) {
         move_rocket(&rocket, -0.7, 0.0, delta_time);
+        moved = 1;
     }
     if (game_data->keys_down[GLFW_KEY_D]) {
         move_rocket(&rocket, 0.0, 0.1, delta_time);
     }
 
     move_rocket(&rocket, 0.0, 0.0, delta_time);
-    draw_rocket(raster, &rocket);
+    draw_rocket(raster, &rocket, smoke_spritesheet, delta_time, moved);
 }
 
 

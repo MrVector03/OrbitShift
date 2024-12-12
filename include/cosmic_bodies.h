@@ -5,6 +5,9 @@
 #include "game_constants.h"
 #include <math.h>
 
+#define SMOKE_SPRITE_WIDTH 32
+#define SMOKE_SPRITE_HEIGHT 32
+
 typedef struct {
     float current_x;
     float current_y;
@@ -37,7 +40,15 @@ typedef struct {
     double curr_x, curr_y;
     double angle;
     double speed;
+    int trail_timer;
+    int curr_particle;
 } spaceship;
+
+typedef struct {
+    int pos_x, pos_y;
+    double smoke_lifespan;
+    int frame;
+} smoke_particle_t;
 
 extern const rafgl_pixel_rgb_t sun_color;
 
@@ -57,11 +68,11 @@ void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixe
 
 void render_planets(rafgl_raster_t raster, solar_system_t *solar_system);
 
-void draw_rocket(rafgl_raster_t raster, spaceship *ship);
+void draw_rocket(rafgl_raster_t raster, spaceship *ship, rafgl_spritesheet_t smoke_spritesheet, float delta_time, int moved);
 
 void move_rocket(spaceship *ship, float thrust, float angle_control, float delta_time);
 
-spaceship init_spaceship(float x, float y, float angle, float speed);
+spaceship init_spaceship(float x, float y, float angle, float speed, int trail_timer);
 
 void link_rocket(spaceship* ship);
 
