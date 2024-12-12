@@ -28,16 +28,25 @@ typedef struct {
     double orbit_speed;
     int orbit_direction; /// 1 - clockwise, -1 - counterclockwise
     float theta;
+
+    /// BLACK HOLE
+    int is_black_hole;
+    int black_hole_corner; /// 1 - top left, 2 - top right, 3 - bottom left, 4 - bottom right
+    int bh_curr_frame_x;
+    int bh_curr_frame_y;
 } cosmic_body_t;
 
 typedef struct {
     cosmic_body_t sun;
     cosmic_body_t planets[32];
+    cosmic_body_t black_hole;
     int num_bodies;
+    rafgl_pixel_rgb_t next_system_color;
 } solar_system_t;
 
 typedef struct {
-    double curr_x, curr_y;
+    float curr_x;
+    float curr_y;
     double angle;
     double speed;
     int trail_timer;
@@ -66,15 +75,15 @@ solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x,
 
 void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixel_rgb_t bg_color, int num_stars);
 
-void render_planets(rafgl_raster_t raster, solar_system_t *solar_system);
+void render_planets(rafgl_raster_t raster, rafgl_spritesheet_t black_hole_spritesheet, solar_system_t *solar_system);
 
 void draw_rocket(rafgl_raster_t raster, spaceship *ship, rafgl_spritesheet_t smoke_spritesheet, float delta_time, int moved);
 
 void move_rocket(spaceship *ship, float thrust, float angle_control, float delta_time);
 
-spaceship init_spaceship(float x, float y, float angle, float speed, int trail_timer);
+spaceship init_spaceship(cosmic_body_t black_hole, float angle, float speed, int trail_timer);
 
-void link_rocket(spaceship* ship);
+void link_rocket(spaceship* ship, int smoke_effects);
 
 void apply_vignette_with_tint(rafgl_raster_t raster, rafgl_pixel_rgb_t tint_color);
 

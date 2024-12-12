@@ -13,11 +13,17 @@ const rafgl_pixel_rgb_t sky_color = { {3, 4, 15} };
 
 static spaceship* rocket;
 
+
+/// FPS CONTROL CENTER
+int show_smoke;
+
+
 smoke_particle_t smoke_particles[MAX_SMOKE_PARTICLES];
 int active_smoke_particles = 0;
 
-void link_rocket(spaceship* ship) {
+void link_rocket(spaceship* ship, int smoke_effects) {
     rocket = ship;
+    show_smoke = smoke_effects;
 }
 
 void draw_realistic_sun(rafgl_raster_t raster, int x, int y, int radius) {
@@ -43,40 +49,7 @@ float vignette_strength(float distance_to_sun, float max_effect_distance, float 
     return max_intensity * (1.0f - (distance_to_sun / max_effect_distance));
 }
 
-
-// void apply_vignette_with_tint(rafgl_raster_t *raster, rafgl_pixel_rgb_t tint_color) {
-//     float dist, vignette_factor = 1.5, r = 350;
-//     rafgl_pixel_rgb_t sampled, result;
-//     float cx = raster->width / 2;
-//     float cy = raster->height / 2;
-//     int x = rocket->curr_x;
-//     int y = rocket->curr_y;
-//
-//
-//     // Iterate through each pixel of the raster
-//     for (int i = 0; i < raster->width; i++) {
-//         for (int j = 0; j < raster->height; j++) {
-//
-//             sampled = tint_color;
-//
-//             dist = rafgl_distance2D(cx,cy, x,y)/r;
-//             dist = powf(dist, 1.8f);
-//
-//             //imamo oduzimanje, jer zelimo da potamnimo sliku kako se udaljavamo
-//             //tj da umanjimo brightness, da smo hteli da nam je sve svetlije ka krajevima
-//             //stavili bismo samo + umesto -
-//             result.r = rafgl_saturatei(sampled.r *(1.0f - dist*vignette_factor));
-//             result.g = rafgl_saturatei(sampled.g *(1.0f - dist*vignette_factor));
-//             result.b = rafgl_saturatei(sampled.b *(1.0f - dist*vignette_factor));
-//
-//             pixel_at_m(raster, x, y) = result;
-//         }
-//     }
-// }
-//
-
-
-void render_planets(rafgl_raster_t raster, solar_system_t *solar_system) {
+void render_planets(rafgl_raster_t raster, rafgl_spritesheet_t black_hole_spritesheet,solar_system_t *solar_system) {
     float dx, dy, distance;
     float distance_fs = sqrt(pow(rocket->curr_x - solar_system->sun.current_x, 2) + pow(rocket->curr_y - solar_system->sun.current_y, 2));
     rafgl_pixel_rgb_t result;
@@ -88,45 +61,42 @@ void render_planets(rafgl_raster_t raster, solar_system_t *solar_system) {
     float rocket_dist = rafgl_distance2D(solar_system->sun.current_x, solar_system->sun.current_y, rocket->curr_x, rocket->curr_y);
     float r = 550.0 + rocket_dist * vignette_scale_factor;
 
+    //printf("B4\n");
+
     for (int i = 0; i < raster.width; i++) {
         for (int j = 0; j < raster.height; j++) {
             for (int k = 0; k < solar_system->num_bodies; k++) {
+                //printf("BODY: %d\n", k);
                 cosmic_body_t *planet = &solar_system->planets[k];
                 float dx = i - planet->current_x;
                 float dy = j - planet->current_y;
                 float distance = sqrt(dx * dx + dy * dy);
                 double noise = (rand() % 100) / 100.0 * sun_surface_noise_factor;
 
-
+                //printf("HERE1\n");
                 if (planet->is_center) {
+                    //printf("HERE2\n");
                     if (distance < planet->radius * (1 + noise))
                         pixel_at_m(raster, i, j) = sun_color;
                 } else if (distance < planet->radius) {
+                    //printf("HERE3\n");
                     pixel_at_m(raster, i, j) = pixel_at_m(planet->texture, planet->initial_x, planet->initial_y);
                 }
             }
         }
     }
+    //printf("SHEET_X: %d", solar_system->black_hole.bh_curr_frame_x);
+    //printf("SHEET_Y: %d", solar_system->black_hole.bh_curr_frame_y);
+    //printf("current_x: %d", solar_system->black_hole.current_x);
+    //printf("current_y: %d", solar_system->black_hole.current_y);
+    rafgl_raster_draw_spritesheet(&raster, &black_hole_spritesheet,
+        solar_system->black_hole.bh_curr_frame_x,
+        solar_system->black_hole.bh_curr_frame_y,
+            (int) solar_system->black_hole.current_x,
+            (int) solar_system->black_hole.current_y);
 
-    // for (int i = 0; i < raster.width; i++) {
-    //     for (int j = 0; j < raster.height; j++) {
-    //         // Distance from rocket to sun (for vignette effect)
-    //         distance_fs = rafgl_distance2D(solar_system->sun.current_x, solar_system->sun.current_y, rocket->curr_x, rocket->curr_y);
-    //         vignette_factor = vignette_strength(distance_fs, 500.0f, 1.5f);
-    //
-    //         // Apply vignette to sun
-    //         rafgl_raster_t sun_color = solar_system->sun.texture;
-    //         rafgl_pixel_rgb_t sun_pixel = pixel_at_m(sun_color, solar_system->sun.initial_x, solar_system->sun.initial_y);
-    //
-    //         // Apply vignette effect to sun color
-    //         result.r = rafgl_saturatei(sun_pixel.r * (1.0 - distance_fs * vignette_factor));
-    //         result.g = rafgl_saturatei(sun_pixel.g * (1.0 - distance_fs * vignette_factor));
-    //         result.b = rafgl_saturatei(sun_pixel.b * (1.0 - distance_fs * vignette_factor));
-    //
-    //         // Assign vignette-adjusted color back to the pixel
-    //         pixel_at_m(raster, i, j) = result;
-    //     }
-    // }
+    solar_system->black_hole.bh_curr_frame_x = (solar_system->black_hole.bh_curr_frame_x + 1) % 8;
+    solar_system->black_hole.bh_curr_frame_y = (solar_system->black_hole.bh_curr_frame_y + 1) % 8;
 
     for (int i = 0; i < solar_system->num_bodies; i++) {
         if (!solar_system->planets[i].is_center) {
@@ -208,6 +178,30 @@ void scatter_stars(rafgl_raster_t raster, int num_stars) {
     }
 }
 
+void set_corner_coords(int corner_type, cosmic_body_t *body) {
+
+    int general_diff = RASTER_HEIGHT / 8;
+
+    switch (corner_type) {
+        case 1:
+            body->current_x = general_diff;
+            body->current_y = general_diff;
+            break;
+        case 2:
+            body->current_x = RASTER_WIDTH - general_diff;
+            body->current_y = general_diff;
+            break;
+        case 3:
+            body->current_x = general_diff;
+            body->current_y = RASTER_HEIGHT - general_diff;
+            break;
+        case 4:
+            body->current_x = RASTER_WIDTH - general_diff;
+            body->current_y = RASTER_HEIGHT - general_diff;
+            break;
+    }
+}
+
 solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x, int sun_y, rafgl_raster_t sun_texture) {
     int curr_orbit_radius_x = 200;
     int curr_orbit_radius_y = 100;
@@ -234,9 +228,8 @@ solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x,
 
         planet.radius = rand() % 20 + 10;
         planet.is_center = 0;
+        planet.is_black_hole = 0;
         planet.texture = generate_perlin_with_color(3, 0.7);
-
-        printf("RAND: %d\n", rand());
 
         planet.orbit_speed = ((rand() % 100) / 1000.0) * (1.0 / i);
         planet.orbit_direction = ((rand() + i) % 2) ? 1 : -1;
@@ -247,6 +240,20 @@ solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x,
         curr_orbit_radius_x += rand() % 100 + planet.radius + 25;
         curr_orbit_radius_y += rand() % 50 + planet.radius + 15;
     }
+
+    cosmic_body_t black_hole;
+    black_hole.is_black_hole = 1;
+    black_hole.radius = 64;
+    black_hole.bh_curr_frame_x = 0;
+    black_hole.bh_curr_frame_y = 0;
+
+    int corner_type = rand() % 4 + 1;
+    black_hole.black_hole_corner = corner_type;
+
+    set_corner_coords(corner_type, &black_hole);
+    solar_system.black_hole = black_hole;
+
+    solar_system.next_system_color = (rafgl_pixel_rgb_t){rand() % 255, rand() % 255, rand() % 255};
 
     return solar_system;
 }
@@ -351,23 +358,25 @@ void draw_rocket(rafgl_raster_t raster, spaceship *ship, rafgl_spritesheet_t smo
     rafgl_raster_draw_line(&raster, (int)x2, (int)y2, (int)x3, (int)y3, &rgb);
     rafgl_raster_draw_line(&raster, (int)x3, (int)y3, (int)x1, (int)y1, &rgb);
 
-    /// Smoke trail
-    int exhaust_x = ship->curr_x - size * cos(ship->angle) + rand() % 10 - 5;
-    int exhaust_y = ship->curr_y - size * sin(ship->angle) + rand() % 10 - 5;
+    if (show_smoke) {
+        /// Smoke trail
+        int exhaust_x = ship->curr_x - size * cos(ship->angle) + rand() % 10 - 5;
+        int exhaust_y = ship->curr_y - size * sin(ship->angle) + rand() % 10 - 5;
 
 
-    //printf("SHEET WIDTH %d\n", smoke_spritesheet.sheet_width);
-    //int frame = (ship->trail_timer * 10) % (smoke_spritesheet.sheet_width / SMOKE_SPRITE_WIDTH);
-    //rafgl_raster_draw_spritesheet(&raster, &smoke_spritesheet, ship->curr_particle, 1, exhaust_x, exhaust_y);
-    //printf("AFTER PRINT\n");
+        //printf("SHEET WIDTH %d\n", smoke_spritesheet.sheet_width);
+        //int frame = (ship->trail_timer * 10) % (smoke_spritesheet.sheet_width / SMOKE_SPRITE_WIDTH);
+        //rafgl_raster_draw_spritesheet(&raster, &smoke_spritesheet, ship->curr_particle, 1, exhaust_x, exhaust_y);
+        //printf("AFTER PRINT\n");
 
-    if (moved) {
-        int frame = rand() % 6;
-        spawn_smoke_particle(exhaust_x, exhaust_y, 5.0, frame);
+        if (moved) {
+            int frame = rand() % 6;
+            spawn_smoke_particle(exhaust_x, exhaust_y, 5.0, frame);
+        }
+
+        update_smoke_particles(delta_time);
+        draw_particles(raster, smoke_spritesheet);
     }
-
-    update_smoke_particles(delta_time);
-    draw_particles(raster, smoke_spritesheet);
 }
 
 void move_rocket(spaceship *ship, float thrust, float angle_control, float delta_time) {
@@ -382,14 +391,30 @@ void move_rocket(spaceship *ship, float thrust, float angle_control, float delta
         ship->angle += angle_control;
     }
 
-    ship->trail_timer += delta_time;
-    ship->curr_particle = (ship->curr_particle + 1) % 6;
+    if (show_smoke) {
+        ship->trail_timer += delta_time;
+        ship->curr_particle = (ship->curr_particle + 1) % 6;
+    }
 }
 
-spaceship init_spaceship(float x, float y, float angle, float speed, int trail_timer) {
+spaceship init_spaceship(cosmic_body_t black_hole, float angle, float speed, int trail_timer) {
     spaceship ship;
-    ship.curr_x = x;
-    ship.curr_y = y;
+
+    int black_hole_x = black_hole.current_x;
+    int black_hole_y = black_hole.current_y;
+
+    /// get sum other corner
+    if (black_hole.black_hole_corner == 1) {
+        black_hole_x = RASTER_WIDTH - black_hole_x;
+        black_hole_y = RASTER_HEIGHT - black_hole_y;
+    } else if (black_hole.black_hole_corner == 2) {
+        black_hole_y = RASTER_HEIGHT - black_hole_y;
+    } else if (black_hole.black_hole_corner == 3) {
+        black_hole_x = RASTER_WIDTH - black_hole_x;
+    }
+
+    ship.curr_x = black_hole_x;
+    ship.curr_y = black_hole_y;
     ship.angle = angle;
     ship.speed = speed;
     ship.trail_timer = trail_timer;
