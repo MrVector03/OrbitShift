@@ -59,11 +59,11 @@ typedef struct {
     int frame;
 } smoke_particle_t;
 
-extern const rafgl_pixel_rgb_t sun_color;
+extern rafgl_pixel_rgb_t sun_color;
 
 extern const double sun_surface_noise_factor;
 
-extern const rafgl_pixel_rgb_t sky_color;
+extern rafgl_pixel_rgb_t sky_color;
 
 void draw_realistic_sun(rafgl_raster_t raster, int x, int y, int radius);
 
@@ -71,7 +71,7 @@ void draw_realistic_sun_with_texture(rafgl_raster_t raster, int x, int y, int ra
 
 void scatter_stars(rafgl_raster_t raster, int num_stars);
 
-solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x, int sun_y, rafgl_raster_t sun_texture);
+solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x, int sun_y);
 
 void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixel_rgb_t bg_color, int num_stars);
 
@@ -86,6 +86,10 @@ spaceship init_spaceship(cosmic_body_t black_hole, float angle, float speed, int
 void link_rocket(spaceship* ship, int smoke_effects);
 
 void apply_vignette_with_tint(rafgl_raster_t raster, rafgl_pixel_rgb_t tint_color);
+
+solar_system_t generate_next_solar_system(rafgl_pixel_rgb_t system_color);
+
+void stabilize_rocket(spaceship *ship, cosmic_body_t black_hole);
 
 #endif //COSMIC_BODIES_H
 

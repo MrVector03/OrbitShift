@@ -46,6 +46,16 @@ rafgl_pixel_rgb_t color_sun = {255, 255, 0};
 
 rafgl_raster_t vignetted_raster;
 
+/// GENERAL SETTINGS
+float distortion_duration = 2.0;
+float distortion_timer = 0.0;
+int distortion_active = 0;
+
+float whiteout_duration = 2.0;
+float whiteout_timer = 0.0;
+int whiteout_active = 0;
+
+
 /// FPS CONTROL CENTER
 int hot_vignette = 1;   /// TURN ON/OFF SUN PROXIMITY VIGNETTE
 int smoke_effects = 1;  /// 0 - NO SMOKE; 1 - SMOKE
@@ -56,6 +66,8 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     raster_width = width;
     raster_height = height;
     srand(time(NULL));
+
+    sky_color = (rafgl_pixel_rgb_t){3, 4, 15};
 
     /// RASTER INITS
     rafgl_raster_init(&raster, raster_width, raster_height);
@@ -70,9 +82,9 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
 
     /// GALAXY TEXTURE
     perlin_raster = generate_perlin(8, 0.7);
-    galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05);
+    galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05, sky_color);
 
-    solar_system = generate_solar_system(num_planets, sun_radius, sun_x, sun_y, perlin_raster);
+    solar_system = generate_solar_system(num_planets, sun_radius, sun_x, sun_y);
 
     /// export color quotients from next_system_color
     black_hole_r = solar_system.next_system_color.r / 255.0;
@@ -106,8 +118,9 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
         debug_mode = 1;
     }
 
-    draw_ellipse(raster, sun_x, sun_y, 100, 50, color_white);
+    //printf("delta time: %f\n", delta_time);
 
+    ///draw_ellipse(raster, sun_x, sun_y, 100, 50, color_white);
 
     float dist, vignette_factor = 1.5, vignette_scale_factor = 0.5;
     rafgl_pixel_rgb_t sampled, result;
@@ -115,8 +128,12 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
     float cy = raster.height / 2;
 
     float rocket_sun_dist = rafgl_distance2D(solar_system.sun.current_x, solar_system.sun.current_y, rocket.curr_x, rocket.curr_y);
-    float rocket_black_hole_dist = rafgl_distance2D(solar_system.black_hole.current_x, solar_system.black_hole.current_y, rocket.curr_x, rocket.curr_y);
+    float rocket_black_hole_dist = rafgl_distance2D(solar_system.black_hole.current_x + 32, solar_system.black_hole.current_y + 32, rocket.curr_x, rocket.curr_y);
     int closer_to_sun = 1;
+
+    if (rocket_black_hole_dist < 25.0) {
+        distortion_active = 1;
+    }
 
     if (rocket_black_hole_dist < rocket_sun_dist) {
         rocket_sun_dist = rocket_black_hole_dist;
@@ -141,60 +158,109 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
 
     render_planets(raster, black_hole_spritesheet, &solar_system);
 
-    int moved = 0;
-    if (game_data->keys_down[GLFW_KEY_W]) {
-        move_rocket(&rocket, 0.7, 0.0, delta_time);
-        moved = 1;
-    }
-    if (game_data->keys_down[GLFW_KEY_A]) {
-        move_rocket(&rocket, 0.0, -0.1, delta_time);
-    }
-    if (game_data->keys_down[GLFW_KEY_S]) {
-        move_rocket(&rocket, -0.7, 0.0, delta_time);
-        moved = 1;
-    }
-    if (game_data->keys_down[GLFW_KEY_D]) {
-        move_rocket(&rocket, 0.0, 0.1, delta_time);
-    }
 
-    move_rocket(&rocket, 0.0, 0.0, delta_time);
-    draw_rocket(raster, &rocket, smoke_spritesheet, delta_time, moved);
 
-    // TODO: Smoothly blend hot and normal vignettes
-    for (int i = 0; i < raster.width; i++) {
-        for (int j = 0; j < raster.height; j++) {
-            dist = rafgl_distance2D(i, j, cx, cy) / r;
+    if (!distortion_active && !whiteout_active) {
+        int moved = 0;
+        if (game_data->keys_down[GLFW_KEY_W]) {
+            move_rocket(&rocket, 0.7, 0.0, delta_time);
+            moved = 1;
+        }
+        if (game_data->keys_down[GLFW_KEY_A]) {
+            move_rocket(&rocket, 0.0, -0.1, delta_time);
+        }
+        if (game_data->keys_down[GLFW_KEY_S]) {
+            move_rocket(&rocket, -0.7, 0.0, delta_time);
+            moved = 1;
+        }
+        if (game_data->keys_down[GLFW_KEY_D]) {
+            move_rocket(&rocket, 0.0, 0.1, delta_time);
+        }
 
-            // Apply a power function to make the vignette effect more pronounced on the edges
-            dist = powf(dist, 1.8f); // You can adjust this exponent to control the softness of the vignette
+        move_rocket(&rocket, 0.0, 0.0, delta_time);
+        draw_rocket(raster, &rocket, smoke_spritesheet, delta_time, moved);
 
-            // Sample the current pixel color (e.g., from the background or previous frame)
-            sampled = pixel_at_m(raster, i, j);
+        // TODO: Smoothly blend hot and normal vignettes
+        for (int i = 0; i < raster.width; i++) {
+            for (int j = 0; j < raster.height; j++) {
+                dist = rafgl_distance2D(i, j, cx, cy) / r;
 
-            float tint_factor = dist * vignette_factor;
+                // Apply a power function to make the vignette effect more pronounced on the edges
+                dist = powf(dist, 1.8f); // You can adjust this exponent to control the softness of the vignette
 
-            if (rocket_sun_dist < 150.0) {
-                // Closer to the sun, shrink and turn the vignette more orange
-                float proximity_factor = 1.0 - (rocket_sun_dist / 500.0);
-                tint_factor *= proximity_factor;
-                result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor) + vignette_r * tint_factor * 255);
-                result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor) + vignette_g * tint_factor * 255);
-                result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor) + vignette_b * tint_factor * 255);
-            } else {
-                // Far from the sun, keep the vignette black in the corners
-                result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor));
-                result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor));
-                result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor));
+                // Sample the current pixel color (e.g., from the background or previous frame)
+                sampled = pixel_at_m(raster, i, j);
+
+                float tint_factor = dist * vignette_factor;
+
+                if (rocket_sun_dist < 150.0) {
+                    // Closer to the sun, shrink and turn the vignette more orange
+                    float proximity_factor = 1.0 - (rocket_sun_dist / 500.0);
+                    tint_factor *= proximity_factor;
+                    result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor) + vignette_r * tint_factor * 255);
+                    result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor) + vignette_g * tint_factor * 255);
+                    result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor) + vignette_b * tint_factor * 255);
+                } else {
+                    // Far from the sun, keep the vignette black in the corners
+                    result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor));
+                    result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor));
+                    result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor));
+                }
+
+                    pixel_at_m(raster, i, j) = result;
+            }
+        }
+    } else {
+        if (distortion_active) {
+            if (distortion_duration / 2.0 < distortion_timer) {
+                whiteout_active = 1;
             }
 
-                pixel_at_m(raster, i, j) = result;
+            if (distortion_timer <= distortion_duration) {
+                apply_screen_distortion(raster, distortion_timer, distortion_duration);
+            } else {
+                distortion_timer = 0.0;
+                distortion_active = 0;
+
+                sky_color.r = rand() % 256;
+                sky_color.g = rand() % 256;
+                sky_color.b = rand() % 256;
+
+
+                galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05, sky_color);
+                set_background(background_raster, galaxy_texture, sky_color, 1000);
+                solar_system = generate_next_solar_system(solar_system.next_system_color);
+
+                orange_r = solar_system.next_system_color.r / 255.0;
+                orange_g = solar_system.next_system_color.g / 255.0;
+                orange_b = solar_system.next_system_color.b / 255.0;
+
+                black_hole_r = (rand() % 256) / 255.0;
+                black_hole_g = (rand() % 256) / 255.0;
+                black_hole_b = (rand() % 256) / 255.0;
+
+                stabilize_rocket(&rocket, solar_system.black_hole);
+
+            }
+            distortion_timer += delta_time;
+        }
+
+        if (whiteout_active) {
+            whiteout_timer += delta_time;
+            if (whiteout_timer <= whiteout_duration) {
+                apply_whiteout(raster, whiteout_timer, whiteout_duration);
+            } else {
+                whiteout_timer = 0.0;
+                whiteout_active = 0;
+            }
+
         }
     }
 }
 
 
 void main_state_render(GLFWwindow *window, void *args) {
-    rafgl_texture_load_from_raster(&texture, debug_mode ? &raster : &test_raster);
+    rafgl_texture_load_from_raster(&texture, debug_mode ? &raster : &handbrake_raster);
     rafgl_texture_show(&texture, 0);
 }
 

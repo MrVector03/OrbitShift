@@ -17,10 +17,18 @@ void map_multiply_and_add(double *dst, double *src, int w, int h, double multipl
 
 void draw_ellipse(rafgl_raster_t raster, int xc, int yc, int rx, int ry, rafgl_pixel_rgb_t color);
 
-rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, double persistence);
+rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, double persistence, rafgl_pixel_rgb_t tint);
 
 void update_ellipsoid_path_point(float *x, float *y, float cx, float cy, float a, float b, float *theta, float delta_time, float speed, int direction);
 
 rafgl_raster_t generate_perlin_with_color(int octaves, double persistence);
+
+void apply_distortion(rafgl_raster_t raster, float distortion_factor);
+
+void apply_screen_distortion(rafgl_raster_t raster, float delta_time_elapsed, float distortion_duration);
+
+void whiteout(rafgl_raster_t raster, float white_factor);
+
+void apply_whiteout(rafgl_raster_t raster, float delta_time_elapsed, float whiteout_duration);
 
 #endif //UTILITY_H

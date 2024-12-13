@@ -7,9 +7,9 @@
 #define MAX_SMOKE_PARTICLES 100
 
 // CONSTANTS
-const rafgl_pixel_rgb_t sun_color = { {214, 75, 15} };
+rafgl_pixel_rgb_t sun_color = { {214, 75, 15} };
 const double sun_surface_noise_factor = 0.01;
-const rafgl_pixel_rgb_t sky_color = { {3, 4, 15} };
+rafgl_pixel_rgb_t sky_color = { {3, 4, 15} };
 
 static spaceship* rocket;
 
@@ -202,12 +202,14 @@ void set_corner_coords(int corner_type, cosmic_body_t *body) {
     }
 }
 
-solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x, int sun_y, rafgl_raster_t sun_texture) {
+solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x, int sun_y) {
     int curr_orbit_radius_x = 200;
     int curr_orbit_radius_y = 100;
 
     solar_system_t solar_system;
-    cosmic_body_t sun = {sun_x, sun_y, sun_radius, 1, sun_texture, sun_x, sun_y, curr_orbit_radius_x, curr_orbit_radius_y};
+    cosmic_body_t sun = {sun_x, sun_y, sun_radius, 1,
+        0, 0, 0,
+        sun_x, sun_y, curr_orbit_radius_x, curr_orbit_radius_y};
     solar_system.sun = sun;
     solar_system.num_bodies = num_planets + 1;
     solar_system.planets[0] = sun;
@@ -261,6 +263,11 @@ solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x,
 void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixel_rgb_t bg_color, int num_stars) {
     for (int i = 0; i < RASTER_WIDTH; i++) {
         for (int j = 0; j < RASTER_HEIGHT; j++) {
+            rafgl_pixel_rgb_t sampled = pixel_at_m(background, i, j);
+            rafgl_pixel_rgb_t result;
+            result.r = rafgl_saturatei(sampled.r + bg_color.r);
+            result.g = rafgl_saturatei(sampled.g + bg_color.g);
+            result.b = rafgl_saturatei(sampled.b + bg_color.b);
             pixel_at_m(raster, i, j) = pixel_at_m(background, i, j);
         }
     }
@@ -422,3 +429,28 @@ spaceship init_spaceship(cosmic_body_t black_hole, float angle, float speed, int
     return ship;
 }
 
+solar_system_t generate_next_solar_system(rafgl_pixel_rgb_t system_color) {
+    int num_planets = rand() % 3;
+    int sun_radius = RASTER_HEIGHT / (40 + rand() % 10);
+    sun_color = system_color;
+    return generate_solar_system(num_planets, sun_radius, RASTER_WIDTH / 2, RASTER_HEIGHT / 2);
+}
+
+void stabilize_rocket(spaceship *rocket, cosmic_body_t black_hole) {
+    // int black_hole_x = black_hole.current_x;
+    // int black_hole_y = black_hole.current_y;
+    //
+    // if (black_hole.black_hole_corner == 1) {
+    //     black_hole_x = RASTER_WIDTH - black_hole_x;
+    //     black_hole_y = RASTER_HEIGHT - black_hole_y;
+    // } else if (black_hole.black_hole_corner == 2) {
+    //     black_hole_y = RASTER_HEIGHT - black_hole_y;
+    // } else if (black_hole.black_hole_corner == 3) {
+    //     black_hole_x = RASTER_WIDTH - black_hole_x;
+    // }
+    //
+    // rocket->curr_x = black_hole_x;
+    // rocket->curr_y = black_hole_y;
+
+    rocket->speed = 0;
+}

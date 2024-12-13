@@ -256,8 +256,8 @@ rafgl_pixel_rgb_t map_to_color(double value) {
     return (rafgl_pixel_rgb_t){255 * darkness_factor, value * 255 * darkness_factor, value * 200 * darkness_factor};                      // Yellow
 }
 
-rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, double persistence) {
-    //srand(time(NULL));
+rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, double persistence, rafgl_pixel_rgb_t tint) {
+    int tint_factor = rand() % 128;
 
     rafgl_raster_t raster;
     rafgl_raster_init(&raster, width, height);
@@ -296,7 +296,14 @@ rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, doubl
 
             double final_value = noise_value * radial;
 
-            pixel_at_m(raster, x, y) = map_to_color(final_value);
+            rafgl_pixel_rgb_t pix = map_to_color(final_value);
+
+            // Apply tint color
+            pix.r = (pix.r * 0.5 + tint.r * 0.5);
+            pix.g = (pix.g * 0.5 + tint.g * 0.5);
+            pix.b = (pix.b * 0.5 + tint.b * 0.5);
+
+            pixel_at_m(raster, x, y) = pix;
         }
     }
 
@@ -389,4 +396,68 @@ rafgl_raster_t generate_perlin_with_color(int octaves, double persistence) {
     free(tmp_map);
 
     return raster;
+}
+
+void apply_screen_distortion(rafgl_raster_t raster, float delta_time_elapsed, float distortion_duration) {
+    float t = delta_time_elapsed / distortion_duration;
+    if (t > 1.0) t = 1.0;
+    float distortion_factor = sin(t * M_PI) * 100.0;
+    apply_distortion(raster, distortion_factor);
+}
+
+void apply_distortion(rafgl_raster_t raster, float distortion_factor) {
+    rafgl_raster_t temp_raster;
+    rafgl_raster_init(&temp_raster, raster.width, raster.height);
+
+    for (int y = 0; y < raster.height; y++) {
+        for (int x = 0; x < raster.width; x++) {
+            // Calculate distortion offsets
+            float offset_x = sin(y * 0.05f) * distortion_factor;
+            float offset_y = cos(x * 0.05f) * distortion_factor;
+
+            // Source pixel position
+            int src_x = (int)(x + offset_x) % raster.width;
+            int src_y = (int)(y + offset_y) % raster.height;
+
+            if (src_x < 0) src_x += raster.width;
+            if (src_y < 0) src_y += raster.height;
+
+            // Copy the distorted pixel
+            pixel_at_m(temp_raster, x, y) = pixel_at_m(raster, src_x, src_y);
+        }
+    }
+
+    // Copy back to the original raster
+    memcpy(raster.data, temp_raster.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
+
+    rafgl_raster_cleanup(&temp_raster);
+}
+
+void apply_whiteout(rafgl_raster_t raster, float delta_time_elapsed, float whiteout_duration) {
+    float t = delta_time_elapsed / whiteout_duration;
+    float peak = whiteout_duration * 0.5;
+
+    if (t > 1.0) t = 1.0;
+
+    float whiteness_factor;
+
+    if (t <= peak) {
+        whiteness_factor = sin(t * M_PI / peak);
+    } else {
+        whiteness_factor = cos(t * M_PI / peak);
+    }
+
+    whiteout(raster, whiteness_factor);
+}
+
+void whiteout(rafgl_raster_t raster, float white_factor) {
+    for (int y = 0; y < raster.height; y++) {
+        for (int x = 0; x < raster.width; x++) {
+            rafgl_pixel_rgb_t pix = pixel_at_m(raster, x, y);
+            pix.r = pix.r + (255 - pix.r) * white_factor;
+            pix.g = pix.g + (255 - pix.g) * white_factor;
+            pix.b = pix.b + (255 - pix.b) * white_factor;
+            pixel_at_m(raster, x, y) = pix;
+        }
+    }
 }
