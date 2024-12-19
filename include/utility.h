@@ -31,4 +31,8 @@ void whiteout(rafgl_raster_t raster, float white_factor);
 
 void apply_whiteout(rafgl_raster_t raster, float delta_time_elapsed, float whiteout_duration);
 
+void custom_rafgl_raster_draw_spritesheet(rafgl_raster_t *raster, rafgl_spritesheet_t *spritesheet, int frame_x, int frame_y, int x, int y);
+
+void apply_radial_blur(rafgl_raster_t raster, rafgl_raster_t *output, float blur_strength);
+
 #endif //UTILITY_H

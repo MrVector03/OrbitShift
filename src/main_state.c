@@ -11,7 +11,8 @@
 #include <game_constants.h>
 #include <utility.h>
 
-static rafgl_raster_t raster, raster2, perlin_raster, galaxy_texture, background_raster, handbrake_raster;
+static rafgl_raster_t raster, raster2, perlin_raster, galaxy_texture, background_raster, handbrake_raster, hyper_raster;
+static rafgl_raster_t raw_background;
 static rafgl_spritesheet_t smoke_spritesheet, black_hole_spritesheet;
 
 static rafgl_raster_t test_raster;
@@ -55,12 +56,10 @@ float whiteout_duration = 2.0;
 float whiteout_timer = 0.0;
 int whiteout_active = 0;
 
-
 /// FPS CONTROL CENTER
 int hot_vignette = 1;   /// TURN ON/OFF SUN PROXIMITY VIGNETTE
 int smoke_effects = 1;  /// 0 - NO SMOKE; 1 - SMOKE
-int num_planets = 0;    /// 0,1,2 - OK;   3,4... - SHITS THE BED
-
+int num_planets = 4;    /// 0,1,2 - OK;   3,4... - SHITS THE BED
 
 void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     raster_width = width;
@@ -75,6 +74,8 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     rafgl_raster_init(&vignetted_raster, raster_width, raster_height);
     rafgl_raster_init(&background_raster, raster_width, raster_height);
     rafgl_raster_init(&test_raster, raster_width, raster_height);
+    rafgl_raster_init(&hyper_raster, raster_width, raster_height);
+    rafgl_raster_init(&raw_background, raster_width, raster_height);
     rafgl_raster_load_from_image(&handbrake_raster, "res/images/handbrake.jpeg");
 
     rafgl_spritesheet_init(&smoke_spritesheet, "res/images/plumeplume.png", 6, 5);
@@ -94,12 +95,21 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     glfwSwapInterval(1);
     rafgl_texture_init(&texture);
 
+    init_stars();
+
+    for (int i = 0; i < RASTER_WIDTH; i++) {
+        for (int j = 0; j < RASTER_HEIGHT; j++) {
+            pixel_at_m(hyper_raster, i, j) = (rafgl_pixel_rgb_t){255, 255, 255};
+        }
+    }
+
     /// ROCKET
     rocket = init_spaceship(solar_system.black_hole, 0.0, 0., 10);
     link_rocket(&rocket, smoke_effects);
 
-    set_background(background_raster, galaxy_texture, sky_color, 1000);
-
+    set_background(raw_background, galaxy_texture, sky_color);
+    memcpy(background_raster.data, raw_background.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
+    add_stars_to_background(background_raster, 1);
 
     for (int i = 0; i < solar_system.num_bodies; i++) {
         draw_ellipse(raster, solar_system.planets[i].orbit_center_x,
@@ -110,7 +120,24 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     }
 }
 
-void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *game_data, void *args) {
+int pressed;
+float location = 0;
+float selector = 0;
+
+
+void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *game_data, void *args)
+{
+    /* hendluj input */
+    if(game_data->is_lmb_down && game_data->is_rmb_down)
+    {
+        pressed = 1;
+        location = rafgl_clampf(game_data->mouse_pos_y, 0, raster_height - 1);
+        selector = 1.0f * location / raster_height;
+    }
+    else
+    {
+        pressed = 0;
+    }
     if (game_data->keys_down[GLFW_KEY_SPACE]) {
         debug_mode = 0;
         rocket.speed = 0.0;
@@ -119,7 +146,11 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
     }
 
     //printf("delta time: %f\n", delta_time);
-
+    //printf("HERE\n");
+    memcpy(background_raster.data, raw_background.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
+    //printf("HEREEE\n");
+    add_stars_to_background(background_raster, 0);
+    //printf("AAAAA\n");
     ///draw_ellipse(raster, sun_x, sun_y, 100, 50, color_white);
 
     float dist, vignette_factor = 1.5, vignette_scale_factor = 0.5;
@@ -130,9 +161,11 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
     float rocket_sun_dist = rafgl_distance2D(solar_system.sun.current_x, solar_system.sun.current_y, rocket.curr_x, rocket.curr_y);
     float rocket_black_hole_dist = rafgl_distance2D(solar_system.black_hole.current_x + 32, solar_system.black_hole.current_y + 32, rocket.curr_x, rocket.curr_y);
     int closer_to_sun = 1;
+    int applY_radial_blur = 0;
 
     if (rocket_black_hole_dist < 25.0) {
         distortion_active = 1;
+        applY_radial_blur = 1;
     }
 
     if (rocket_black_hole_dist < rocket_sun_dist) {
@@ -144,15 +177,24 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
 
     float vignette_r, vignette_g, vignette_b;
 
-    if (closer_to_sun) {
-        vignette_r = orange_r;
-        vignette_g = orange_g;
-        vignette_b = orange_b;
-    } else {
-        vignette_r = black_hole_r;
-        vignette_g = black_hole_g;
-        vignette_b = black_hole_b;
-    }
+    float sun_influence = fmax(0.0, 1.0 - rocket_sun_dist / 100.0);
+    float black_hole_influence = fmax(0.0, 1.0 - rocket_black_hole_dist / 100.0);
+
+
+    float total_influence = sun_influence + black_hole_influence;
+    sun_influence /= total_influence;
+    black_hole_influence /= total_influence;
+    float default_influence = 1.0 - (sun_influence + black_hole_influence);
+
+    vignette_r = default_influence * 0.0
+                     + sun_influence * orange_r
+                     + black_hole_influence * black_hole_r;
+    vignette_g = default_influence * 0.0
+                     + sun_influence * orange_g
+                     + black_hole_influence * black_hole_g;
+    vignette_b = default_influence * 0.0
+                     + sun_influence * orange_b
+                     + black_hole_influence * black_hole_b;
 
     memcpy(raster.data, background_raster.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
 
@@ -185,23 +227,19 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
             for (int j = 0; j < raster.height; j++) {
                 dist = rafgl_distance2D(i, j, cx, cy) / r;
 
-                // Apply a power function to make the vignette effect more pronounced on the edges
                 dist = powf(dist, 1.8f); // You can adjust this exponent to control the softness of the vignette
 
-                // Sample the current pixel color (e.g., from the background or previous frame)
                 sampled = pixel_at_m(raster, i, j);
 
                 float tint_factor = dist * vignette_factor;
 
-                if (rocket_sun_dist < 150.0) {
-                    // Closer to the sun, shrink and turn the vignette more orange
-                    float proximity_factor = 1.0 - (rocket_sun_dist / 500.0);
+                if (rocket_sun_dist < 100.0) {
+                    float proximity_factor = 1.0 - (rocket_sun_dist / 100.0);
                     tint_factor *= proximity_factor;
                     result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor) + vignette_r * tint_factor * 255);
                     result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor) + vignette_g * tint_factor * 255);
                     result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor) + vignette_b * tint_factor * 255);
                 } else {
-                    // Far from the sun, keep the vignette black in the corners
                     result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor));
                     result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor));
                     result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor));
@@ -228,7 +266,7 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
 
 
                 galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05, sky_color);
-                set_background(background_raster, galaxy_texture, sky_color, 1000);
+                set_background(raw_background, galaxy_texture, sky_color);
                 solar_system = generate_next_solar_system(solar_system.next_system_color);
 
                 orange_r = solar_system.next_system_color.r / 255.0;
@@ -240,6 +278,9 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
                 black_hole_b = (rand() % 256) / 255.0;
 
                 stabilize_rocket(&rocket, solar_system.black_hole);
+
+                rocket.curr_x = raster_width - solar_system.black_hole.current_x;
+                rocket.curr_y = raster_height - solar_system.black_hole.current_y;
 
             }
             distortion_timer += delta_time;
@@ -256,6 +297,12 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
 
         }
     }
+    int speed = 10 + 90 * selector;
+
+    update_stars(speed);
+    render_stars(hyper_raster, speed);
+
+    move_background_stars();
 }
 
 
@@ -266,5 +313,9 @@ void main_state_render(GLFWwindow *window, void *args) {
 
 
 void main_state_cleanup(GLFWwindow *window, void *args) {
-
+    rafgl_raster_cleanup(&raster);
+    rafgl_raster_cleanup(&raster2);
+    rafgl_raster_cleanup(&vignetted_raster);
+    rafgl_raster_cleanup(&background_raster);
+    rafgl_raster_cleanup(&test_raster);
 }

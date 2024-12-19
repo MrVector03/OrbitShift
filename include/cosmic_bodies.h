@@ -8,6 +8,9 @@
 #define SMOKE_SPRITE_WIDTH 32
 #define SMOKE_SPRITE_HEIGHT 32
 
+#define MAX_STARS 500
+#define MAX_STARS_Z 2000
+
 typedef struct {
     float current_x;
     float current_y;
@@ -59,6 +62,16 @@ typedef struct {
     int frame;
 } smoke_particle_t;
 
+typedef struct {
+    int x, y, z;
+} star_t;
+
+typedef struct {
+    float x;
+    float y;
+    int layer; /// 0 - closest, 1 - middle, 2 - farthest
+} background_star_t;
+
 extern rafgl_pixel_rgb_t sun_color;
 
 extern const double sun_surface_noise_factor;
@@ -69,11 +82,11 @@ void draw_realistic_sun(rafgl_raster_t raster, int x, int y, int radius);
 
 void draw_realistic_sun_with_texture(rafgl_raster_t raster, int x, int y, int radius, rafgl_raster_t sun_texture, double smooth_factor);
 
-void scatter_stars(rafgl_raster_t raster, int num_stars);
+void scatter_stars(rafgl_raster_t raster, int num_stars, int layer);
 
 solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x, int sun_y);
 
-void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixel_rgb_t bg_color, int num_stars);
+void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixel_rgb_t bg_color);
 
 void render_planets(rafgl_raster_t raster, rafgl_spritesheet_t black_hole_spritesheet, solar_system_t *solar_system);
 
@@ -90,6 +103,18 @@ void apply_vignette_with_tint(rafgl_raster_t raster, rafgl_pixel_rgb_t tint_colo
 solar_system_t generate_next_solar_system(rafgl_pixel_rgb_t system_color);
 
 void stabilize_rocket(spaceship *ship, cosmic_body_t black_hole);
+
+void init_stars();
+
+void render_stars(rafgl_raster_t raster, int speed);
+
+void update_stars(int speed);
+
+void move_background_stars();
+
+void draw_background_stars(rafgl_raster_t raster);
+
+void add_stars_to_background(rafgl_raster_t background_raster, int new_stars);
 
 #endif //COSMIC_BODIES_H
 

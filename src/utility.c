@@ -461,3 +461,68 @@ void whiteout(rafgl_raster_t raster, float white_factor) {
         }
     }
 }
+
+void custom_rafgl_raster_draw_spritesheet(rafgl_raster_t *raster, rafgl_spritesheet_t *spritesheet, int frame_x, int frame_y, int x, int y) {
+    int frame_width = spritesheet->frame_width;
+    int frame_height = spritesheet->frame_height;
+    int sheet_width = spritesheet->sheet_width;
+
+    int frame_x_pos = (frame_x % (sheet_width / frame_width)) * frame_width;
+    int frame_y_pos = (frame_y / (sheet_width / frame_width)) * frame_height;
+
+    rafgl_pixel_rgb_t background_color = {255, 0, 249, 255}; // #FF00F9
+
+    for (int i = 0; i < frame_width; i++) {
+        for (int j = 0; j < frame_height; j++) {
+            rafgl_pixel_rgb_t pixel = rafgl_point_sample(&spritesheet->sheet, (float)(frame_x_pos + i) / sheet_width, (float)(frame_y_pos + j) / spritesheet->sheet_height);
+            if (pixel.r != background_color.r || pixel.g != background_color.g || pixel.b != background_color.b) { // Check if the pixel is not the background color
+                pixel_at_pm(raster, x + i, y + j) = pixel;
+            }
+        }
+    }
+}
+
+void apply_radial_blur(rafgl_raster_t raster, rafgl_raster_t *output, float blur_strength) {
+    int x, y, sx, sy;
+    float dx, dy, distance, weight, total_weight;
+    rafgl_pixel_rgb_t original_color, sample_color, final_color;
+
+    int width = raster.width;
+    int height = raster.height;
+    int center_x = width / 2;
+    int center_y = height / 2;
+
+    for (y = 0; y < height; y++) {
+        for (x = 0; x < width; x++) {
+            dx = x - center_x;
+            dy = y - center_y;
+            distance = sqrt(dx * dx + dy * dy);
+
+            final_color = (rafgl_pixel_rgb_t){0, 0, 0};
+            total_weight = 0.0f;
+
+            // Radial sampling
+            for (float t = 0.0f; t <= 1.0f; t += 1.0f / blur_strength) {
+                sx = center_x + (int)(dx * t);
+                sy = center_y + (int)(dy * t);
+
+                if (sx >= 0 && sx < width && sy >= 0 && sy < height) {
+                    sample_color = pixel_at_m(raster, sx, sy);
+                    weight = 1.0f - t;
+                    final_color.r += sample_color.r * weight;
+                    final_color.g += sample_color.g * weight;
+                    final_color.b += sample_color.b * weight;
+                    total_weight += weight;
+                }
+            }
+
+            // Normalize the color by total weight
+            final_color.r = (int)(final_color.r / total_weight);
+            final_color.g = (int)(final_color.g / total_weight);
+            final_color.b = (int)(final_color.b / total_weight);
+
+            // Write to output raster
+            pixel_at_m(raster, x, y) = final_color;
+        }
+    }
+}

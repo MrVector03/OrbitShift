@@ -525,7 +525,7 @@ int rafgl_game_init(rafgl_game_t *game, const char *title, int window_width, int
 
     glfwSetKeyCallback(__window, __key_callback);
 
-    RAFGL_COLOUR_KEY.rgba = rafgl_RGB(255, 0, 254);
+    RAFGL_COLOUR_KEY.rgba = rafgl_RGB(255, 0, 249);
     rafgl_spritesheet_init(&__mono_char_sheet[0], "res/fonts/chars-small.png", __countx, __county);
     rafgl_spritesheet_init(&__mono_char_sheet[1], "res/fonts/chars.png", __countx, __county);
     rafgl_spritesheet_init(&__mono_char_sheet[2], "res/fonts/chars-large.png", __countx, __county);

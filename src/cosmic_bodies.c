@@ -4,8 +4,6 @@
 #include <time.h>
 #include <utility.h>
 
-#define MAX_SMOKE_PARTICLES 100
-
 // CONSTANTS
 rafgl_pixel_rgb_t sun_color = { {214, 75, 15} };
 const double sun_surface_noise_factor = 0.01;
@@ -13,13 +11,96 @@ rafgl_pixel_rgb_t sky_color = { {3, 4, 15} };
 
 static spaceship* rocket;
 
+/// BACKGROUND STARS
+background_star_t closest_stars[1000];
+int closest_stars_count = 0;
+background_star_t middle_stars[1000];
+int middle_stars_count = 0;
+background_star_t farthest_stars[1000];
+int farthest_stars_count = 0;
 
-/// FPS CONTROL CENTER
 int show_smoke;
-
 
 smoke_particle_t smoke_particles[MAX_SMOKE_PARTICLES];
 int active_smoke_particles = 0;
+
+star_t hyperdrive_stars[MAX_STARS];
+
+
+void init_stars() {
+    for (int i = 0; i < MAX_STARS; i++) {
+        hyperdrive_stars[i].x = (randf() - 0.5f) * 2.0f * RASTER_WIDTH;
+        hyperdrive_stars[i].y = (randf() - 0.5f) * 2.0f * RASTER_HEIGHT;
+        hyperdrive_stars[i].z = randf() * MAX_STARS_Z;
+    }
+}
+
+void update_stars(int speed) {
+    for (int i = 0; i < MAX_STARS; i++) {
+        hyperdrive_stars[i].z -= speed;
+        if (hyperdrive_stars[i].z <= 1) {
+            hyperdrive_stars[i].z += MAX_STARS_Z;
+            hyperdrive_stars[i].x = randf() * MAX_STARS_Z - MAX_STARS_Z / 2;
+            hyperdrive_stars[i].y = randf() * MAX_STARS_Z - MAX_STARS_Z / 2;
+        }
+    }
+}
+
+void render_stars(rafgl_raster_t raster, int speed) {
+    int brightness;
+    float sx0, sy0, sx1, sy1;
+
+    for (int i = 0; i < MAX_STARS; i++) {
+        sx1 = RASTER_WIDTH / 2 + hyperdrive_stars[i].x * (0.5 * RASTER_WIDTH / hyperdrive_stars[i].z);
+        sy1 = RASTER_HEIGHT / 2 + hyperdrive_stars[i].y * (0.5 * RASTER_HEIGHT / hyperdrive_stars[i].z);
+
+        sx0 = RASTER_WIDTH / 2 + hyperdrive_stars[i].x * (0.5 * RASTER_WIDTH / (hyperdrive_stars[i].z + speed));
+        sy0 = RASTER_HEIGHT / 2 + hyperdrive_stars[i].y * (0.5 * RASTER_HEIGHT / (hyperdrive_stars[i].z + speed));
+
+        brightness = 255 - ((float)hyperdrive_stars[i].z / MAX_STARS_Z) * 255.0f;
+
+        rafgl_raster_draw_line(&raster, sx1, sy1, sx0, sy0, rafgl_RGB(brightness, brightness, brightness));
+    }
+}
+
+void move_background_stars() {
+    //printf("COUNT CLOSEST: %d\n", closest_stars_count);
+    //printf("COUNT MIDDLE: %d\n", middle_stars_count);
+    //printf("COUNT FARTHEST: %d\n", farthest_stars_count);
+    for (int i = 0; i < closest_stars_count; i++) {
+        closest_stars[i].y += CLOSEST_STAR_SPEED;
+        closest_stars[i].x += CLOSEST_STAR_SPEED / 2;
+        if (closest_stars[i].y >= RASTER_HEIGHT) {
+            closest_stars[i].y = 0;
+        }
+        if (closest_stars[i].x >= RASTER_WIDTH) {
+            closest_stars[i].x = 0;
+        }
+    }
+    //("HERE 1\n");
+    for (int i = 0; i < middle_stars_count; i++) {
+        middle_stars[i].y += MIDDLE_STAR_SPEED;
+        middle_stars[i].x += CLOSEST_STAR_SPEED / 2;
+        if (middle_stars[i].y >= RASTER_HEIGHT) {
+            middle_stars[i].y = 0;
+        }
+        if (middle_stars[i].x >= RASTER_WIDTH) {
+            middle_stars[i].x = 0;
+        }
+    }
+    //printf("HERE 2\n");
+    for (int i = 0; i < farthest_stars_count; i++) {
+        farthest_stars[i].y += FARTHEST_STAR_SPEED;
+        farthest_stars[i].x += CLOSEST_STAR_SPEED / 2;
+        if (farthest_stars[i].y >= RASTER_HEIGHT) {
+            farthest_stars[i].y = 0;
+        }
+        if (farthest_stars[i].x >= RASTER_WIDTH) {
+            farthest_stars[i].x = 0;
+        }
+    }
+    //printf("HERE 3\n");
+}
 
 void link_rocket(spaceship* ship, int smoke_effects) {
     rocket = ship;
@@ -50,45 +131,25 @@ float vignette_strength(float distance_to_sun, float max_effect_distance, float 
 }
 
 void render_planets(rafgl_raster_t raster, rafgl_spritesheet_t black_hole_spritesheet,solar_system_t *solar_system) {
-    float dx, dy, distance;
-    float distance_fs = sqrt(pow(rocket->curr_x - solar_system->sun.current_x, 2) + pow(rocket->curr_y - solar_system->sun.current_y, 2));
-    rafgl_pixel_rgb_t result;
-
-    float dist, vignette_factor = 1.5, vignette_scale_factor = 0.5;
-    rafgl_pixel_rgb_t sampled;
-    float cx = raster.width / 2;
-    float cy = raster.height / 2;
-    float rocket_dist = rafgl_distance2D(solar_system->sun.current_x, solar_system->sun.current_y, rocket->curr_x, rocket->curr_y);
-    float r = 550.0 + rocket_dist * vignette_scale_factor;
-
-    //printf("B4\n");
-
-    for (int i = 0; i < raster.width; i++) {
-        for (int j = 0; j < raster.height; j++) {
-            for (int k = 0; k < solar_system->num_bodies; k++) {
-                //printf("BODY: %d\n", k);
-                cosmic_body_t *planet = &solar_system->planets[k];
-                float dx = i - planet->current_x;
-                float dy = j - planet->current_y;
-                float distance = sqrt(dx * dx + dy * dy);
-                double noise = (rand() % 100) / 100.0 * sun_surface_noise_factor;
-
-                //printf("HERE1\n");
-                if (planet->is_center) {
-                    //printf("HERE2\n");
-                    if (distance < planet->radius * (1 + noise))
-                        pixel_at_m(raster, i, j) = sun_color;
-                } else if (distance < planet->radius) {
-                    //printf("HERE3\n");
-                    pixel_at_m(raster, i, j) = pixel_at_m(planet->texture, planet->initial_x, planet->initial_y);
+    for (int planet_id = 0; planet_id < solar_system->num_bodies; planet_id++) {
+        cosmic_body_t *planet = &solar_system->planets[planet_id];
+        if (planet->is_center) {
+            draw_realistic_sun(raster, (int)planet->current_x, (int)planet->current_y, planet->radius);
+        } else {
+            int top_left_x = planet->current_x - planet->radius;
+            int top_left_y = planet->current_y - planet->radius;
+            for (int i = 0; i < solar_system->planets[planet_id].radius * 2 + 20; i++) {
+                for (int j = 0; j < solar_system->planets[planet_id].radius * 2 + 20; j++) {
+                    int dx = top_left_x + i;
+                    int dy = top_left_y + j;
+                    if (dx >= 0 && dx < raster.width && dy >= 0 && dy < raster.height && rafgl_distance2D((float)dx, (float)dy, planet->current_x, planet->current_y) < planet->radius) {
+                        pixel_at_m(raster, dx, dy) = pixel_at_m(planet->texture, i, j);
+                    }
                 }
             }
         }
     }
-    //printf("SHEET_X: %d", solar_system->black_hole.bh_curr_frame_x);
-    //printf("SHEET_Y: %d", solar_system->black_hole.bh_curr_frame_y);
-    //printf("current_x: %d", solar_system->black_hole.current_x);
-    //printf("current_y: %d", solar_system->black_hole.current_y);
+
     rafgl_raster_draw_spritesheet(&raster, &black_hole_spritesheet,
         solar_system->black_hole.bh_curr_frame_x,
         solar_system->black_hole.bh_curr_frame_y,
@@ -169,12 +230,83 @@ void draw_realistic_sun_with_texture(rafgl_raster_t raster, int x, int y, int ra
     }
 }
 
-void scatter_stars(rafgl_raster_t raster, int num_stars) {
+void render_background_star(rafgl_raster_t raster, background_star_t star) {
+
+    //printf("PRINTING STAR\n");
+
+    /// TODO: DECIDE ON STAR COLORS
+    rafgl_pixel_rgb_t star_color = {255, 255, 255};
+
+    if (star.layer == 0) {
+        star_color = (rafgl_pixel_rgb_t){255, 255, 255};
+    } else if (star.layer == 1) {
+        star_color = (rafgl_pixel_rgb_t){200, 200, 200};
+    } else {
+        star_color = (rafgl_pixel_rgb_t){150, 150, 150};
+    }
+
+    if (star.layer == 0) {
+        for (int xi = star.x; xi < star.x + CLOSEST_STAR_SIZE; xi++) {
+            for (int yi = star.y; yi < star.y + CLOSEST_STAR_SIZE; yi++) {
+                if (xi >= RASTER_WIDTH || yi >= RASTER_HEIGHT) {
+                    continue;
+                }
+                pixel_at_m(raster, xi, yi) = star_color;
+            }
+        }
+    } else if (star.layer == 1) {
+        for (int xi = star.x; xi < star.x + MIDDLE_STAR_SIZE; xi++) {
+            for (int yi = star.y; yi < star.y + MIDDLE_STAR_SIZE; yi++) {
+                if (xi >= RASTER_WIDTH || yi >= RASTER_HEIGHT) {
+                    continue;
+                }
+                pixel_at_m(raster, xi, yi) = star_color;
+            }
+        }
+    } else {
+        for (int xi = star.x; xi < star.x + FARTHEST_STAR_SIZE; xi++) {
+            for (int yi = star.y; yi < star.y + FARTHEST_STAR_SIZE; yi++) {
+                if (xi >= RASTER_WIDTH || yi >= RASTER_HEIGHT) {
+                    continue;
+                }
+                pixel_at_m(raster, xi, yi) = star_color;
+            }
+        }
+    }
+    //printf("FINISHED PRINTING STAR\n");
+}
+
+void draw_background_stars(rafgl_raster_t raster) {
+    for (int i = 0; i < closest_stars_count; i++) {
+        render_background_star(raster, closest_stars[i]);
+    }
+    for (int i = 0; i < middle_stars_count; i++) {
+        render_background_star(raster, middle_stars[i]);
+    }
+    for (int i = 0; i < farthest_stars_count; i++) {
+        render_background_star(raster, farthest_stars[i]);
+    }
+}
+
+
+void scatter_stars(rafgl_raster_t raster, int num_stars, int layer) {
     for (int i = 0; i < num_stars; i++) {
         int x = rand() % RASTER_WIDTH;
         int y = rand() % RASTER_HEIGHT;
         rafgl_pixel_rgb_t star_color = {255, 255, 255};
-        pixel_at_m(raster, x, y) = star_color;
+
+        background_star_t star = {x, y, layer};
+        //printf("BEFORE\n");
+        if (layer == 0) {
+            closest_stars[closest_stars_count++] = star;
+        } else if (layer == 1) {
+            middle_stars[middle_stars_count++] = star;
+        } else {
+            farthest_stars[farthest_stars_count++] = star;
+        }
+        //printf("AFTER\n");
+
+        render_background_star(raster, star);
     }
 }
 
@@ -257,10 +389,14 @@ solar_system_t generate_solar_system(int num_planets, int sun_radius, int sun_x,
 
     solar_system.next_system_color = (rafgl_pixel_rgb_t){rand() % 255, rand() % 255, rand() % 255};
 
+    for (int i = 0; i < active_smoke_particles; i++) {
+        smoke_particles[i] = (smoke_particle_t){0, 0, 0, 0};
+    }
+
     return solar_system;
 }
 
-void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixel_rgb_t bg_color, int num_stars) {
+void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixel_rgb_t bg_color) {
     for (int i = 0; i < RASTER_WIDTH; i++) {
         for (int j = 0; j < RASTER_HEIGHT; j++) {
             rafgl_pixel_rgb_t sampled = pixel_at_m(background, i, j);
@@ -271,9 +407,30 @@ void set_background(rafgl_raster_t raster, rafgl_raster_t background, rafgl_pixe
             pixel_at_m(raster, i, j) = pixel_at_m(background, i, j);
         }
     }
-
-    scatter_stars(raster, num_stars);
 }
+
+void add_stars_to_background(rafgl_raster_t background_raster, int new_stars) {
+    if (new_stars) {
+        closest_stars_count = 0;
+        middle_stars_count = 0;
+        farthest_stars_count = 0;
+
+        scatter_stars(background_raster, CLOSEST_STAR_COUNT, 0);
+        scatter_stars(background_raster, MIDDLE_STAR_COUNT, 1);
+        scatter_stars(background_raster, FARTHEST_STAR_COUNT, 2);
+    } else {
+        for (int i = 0; i < closest_stars_count; i++) {
+            render_background_star(background_raster, closest_stars[i]);
+        }
+        for (int i = 0; i < middle_stars_count; i++) {
+            render_background_star(background_raster, middle_stars[i]);
+        }
+        for (int i = 0; i < farthest_stars_count; i++) {
+            render_background_star(background_raster, farthest_stars[i]);
+        }
+    }
+}
+
 
 void fill_triangle(rafgl_raster_t raster, int x1, int y1, int x2, int y2, int x3, int y3, rafgl_pixel_rgb_t *color) {
     if (y1 > y2) {
@@ -325,9 +482,8 @@ void update_smoke_particles(float delta_time) {
             i--;
         }
 
-        /// SHIT HITS THE FAN (iz nekog razloga duva vetar u svemiru)
-        smoke_particles[i].pos_x += rand() % 3 + 2;
-        smoke_particles[i].pos_y += rand() % 3 - 2;
+        smoke_particles[i].pos_x += rand() % 5 - 2;
+        smoke_particles[i].pos_y += rand() % 5 - 2;
     }
 }
 
