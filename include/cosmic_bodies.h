@@ -5,11 +5,7 @@
 #include "game_constants.h"
 #include <math.h>
 
-#define SMOKE_SPRITE_WIDTH 32
-#define SMOKE_SPRITE_HEIGHT 32
 
-#define MAX_STARS 500
-#define MAX_STARS_Z 2000
 
 typedef struct {
     float current_x;
@@ -63,7 +59,8 @@ typedef struct {
 } smoke_particle_t;
 
 typedef struct {
-    int x, y, z;
+    float x, y, z;
+    float speed;
 } star_t;
 
 typedef struct {
@@ -106,15 +103,19 @@ void stabilize_rocket(spaceship *ship, cosmic_body_t black_hole);
 
 void init_stars();
 
-void render_stars(rafgl_raster_t raster, int speed);
+void render_stars(rafgl_raster_t *raster, int width, int height);
 
-void update_stars(int speed);
+void update_stars(float delta_time, int width, int height);
 
 void move_background_stars();
 
 void draw_background_stars(rafgl_raster_t raster);
 
 void add_stars_to_background(rafgl_raster_t background_raster, int new_stars);
+
+void render_stars_with_shaking(rafgl_raster_t *raster, int width, int height, float delta_time, rafgl_pixel_rgb_t next_system_color, int ending);
+
+void draw_hyperspeed_rocket(rafgl_raster_t *raster, int width, int height, float delta_time);
 
 #endif //COSMIC_BODIES_H
 

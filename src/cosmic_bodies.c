@@ -24,44 +24,162 @@ int show_smoke;
 smoke_particle_t smoke_particles[MAX_SMOKE_PARTICLES];
 int active_smoke_particles = 0;
 
-star_t hyperdrive_stars[MAX_STARS];
+star_t hyperdrive_stars[MAX_HYPER_STARS];
 
 
 void init_stars() {
-    for (int i = 0; i < MAX_STARS; i++) {
-        hyperdrive_stars[i].x = (randf() - 0.5f) * 2.0f * RASTER_WIDTH;
-        hyperdrive_stars[i].y = (randf() - 0.5f) * 2.0f * RASTER_HEIGHT;
-        hyperdrive_stars[i].z = randf() * MAX_STARS_Z;
+    for (int i = 0; i < MAX_HYPER_STARS; i++) {
+        hyperdrive_stars[i].x += ((float)rand() / RAND_MAX - 0.5f) * 0.1f; // Random offset in X
+        hyperdrive_stars[i].y += ((float)rand() / RAND_MAX - 0.5f) * 0.1f; // Random offset in Y
+
+        hyperdrive_stars[i].z = ((float)rand() / RAND_MAX) * 100.0f + 1.0f; // Closer stars move faster
+        hyperdrive_stars[i].speed = HYPER_STAR_SPEED;
     }
 }
 
-void update_stars(int speed) {
-    for (int i = 0; i < MAX_STARS; i++) {
-        hyperdrive_stars[i].z -= speed;
-        if (hyperdrive_stars[i].z <= 1) {
-            hyperdrive_stars[i].z += MAX_STARS_Z;
-            hyperdrive_stars[i].x = randf() * MAX_STARS_Z - MAX_STARS_Z / 2;
-            hyperdrive_stars[i].y = randf() * MAX_STARS_Z - MAX_STARS_Z / 2;
+void update_stars(float delta_time, int width, int height) {
+    for (int i = 0; i < MAX_HYPER_STARS; i++) {
+        hyperdrive_stars[i].z -= hyperdrive_stars[i].speed * delta_time;
+
+        // Add chaotic direction offsets
+        hyperdrive_stars[i].x += ((float)rand() / RAND_MAX - 0.5f) * 0.1f;
+        hyperdrive_stars[i].y += ((float)rand() / RAND_MAX - 0.5f) * 0.1f;
+
+        // Reset if out of bounds or too close
+        if (hyperdrive_stars[i].z <= 0 || fabs(hyperdrive_stars[i].x / hyperdrive_stars[i].z) > width || fabs(hyperdrive_stars[i].y / hyperdrive_stars[i].z) > height) {
+            hyperdrive_stars[i].x = ((float)rand() / RAND_MAX - 0.5f) * width * 2.0f;
+            hyperdrive_stars[i].y = ((float)rand() / RAND_MAX - 0.5f) * height * 2.0f;
+            hyperdrive_stars[i].z = ((float)rand() / RAND_MAX) * 100.0f + 1.0f;
+            hyperdrive_stars[i].speed = ((float)rand() / RAND_MAX) * 5.0f + 1.0f;
         }
     }
 }
 
-void render_stars(rafgl_raster_t raster, int speed) {
-    int brightness;
-    float sx0, sy0, sx1, sy1;
 
-    for (int i = 0; i < MAX_STARS; i++) {
-        sx1 = RASTER_WIDTH / 2 + hyperdrive_stars[i].x * (0.5 * RASTER_WIDTH / hyperdrive_stars[i].z);
-        sy1 = RASTER_HEIGHT / 2 + hyperdrive_stars[i].y * (0.5 * RASTER_HEIGHT / hyperdrive_stars[i].z);
+void render_stars(rafgl_raster_t *raster, int width, int height) {
+    for (int i = 0; i < MAX_HYPER_STARS; i++) {
+        float streak_length = 1.0f + (50.0f / hyperdrive_stars[i].z);
+        float prev_x = hyperdrive_stars[i].x / (hyperdrive_stars[i].z + hyperdrive_stars[i].speed * streak_length);
+        float prev_y = hyperdrive_stars[i].y / (hyperdrive_stars[i].z + hyperdrive_stars[i].speed * streak_length);
+        float cur_x = hyperdrive_stars[i].x / hyperdrive_stars[i].z;
+        float cur_y = hyperdrive_stars[i].y / hyperdrive_stars[i].z;
 
-        sx0 = RASTER_WIDTH / 2 + hyperdrive_stars[i].x * (0.5 * RASTER_WIDTH / (hyperdrive_stars[i].z + speed));
-        sy0 = RASTER_HEIGHT / 2 + hyperdrive_stars[i].y * (0.5 * RASTER_HEIGHT / (hyperdrive_stars[i].z + speed));
+        int screen_prev_x = (int)(prev_x * width + width / 2);
+        int screen_prev_y = (int)(prev_y * height + height / 2);
+        int screen_cur_x = (int)(cur_x * width + width / 2);
+        int screen_cur_y = (int)(cur_y * height + height / 2);
 
-        brightness = 255 - ((float)hyperdrive_stars[i].z / MAX_STARS_Z) * 255.0f;
+        int color = rafgl_RGB(rand() % 256, rand() % 256, 255); // Chaotic colors
 
-        rafgl_raster_draw_line(&raster, sx1, sy1, sx0, sy0, rafgl_RGB(brightness, brightness, brightness));
+        rafgl_raster_draw_line(raster, screen_cur_x, screen_cur_y, screen_prev_x, screen_prev_y, color);
     }
 }
+
+void render_stars_with_shaking(rafgl_raster_t *raster, int width, int height, float delta_time, rafgl_pixel_rgb_t next_system_color, int ending) {
+    static float shake_intensity = 0.0f;
+    const float max_shake = 10.0f;
+    static int system_star_chance = 0;
+    system_star_chance += 1;
+
+    // Update shake intensity
+    shake_intensity += delta_time * 0.5f; // Increase shake over time
+    if (shake_intensity > max_shake) shake_intensity = max_shake;
+
+    // Generate random offsets
+    float random_offset_x = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * shake_intensity;
+    float random_offset_y = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * shake_intensity;
+
+    // Render stars with rumbling effect
+    for (int i = 0; i < MAX_HYPER_STARS; i++) {
+        float streak_length = 1.0f + (50.0f / hyperdrive_stars[i].z);
+        float prev_x = hyperdrive_stars[i].x / (hyperdrive_stars[i].z + hyperdrive_stars[i].speed * streak_length);
+        float prev_y = hyperdrive_stars[i].y / (hyperdrive_stars[i].z + hyperdrive_stars[i].speed * streak_length);
+        float cur_x = hyperdrive_stars[i].x / hyperdrive_stars[i].z;
+        float cur_y = hyperdrive_stars[i].y / hyperdrive_stars[i].z;
+
+        int screen_prev_x = (int)(prev_x * width + width / 2 + random_offset_x);
+        int screen_prev_y = (int)(prev_y * height + height / 2 + random_offset_y);
+        int screen_cur_x = (int)(cur_x * width + width / 2 + random_offset_x);
+        int screen_cur_y = (int)(cur_y * height + height / 2 + random_offset_y);
+
+        int color = rafgl_RGB(rand() % 256, rand() % 256, 255); // Chaotic colors
+        /// chances for system star color are getting increasingly higher as time goes on
+        if (system_star_chance > 75) {
+            color = rafgl_RGB(next_system_color.r, next_system_color.g, next_system_color.b);
+        }
+
+        if (screen_cur_x != screen_prev_x || screen_cur_y != screen_prev_y) {
+            rafgl_raster_draw_line(raster, screen_cur_x, screen_cur_y, screen_prev_x, screen_prev_y, color);
+        }
+    }
+    if (ending) {
+        shake_intensity = 0.0f;
+        system_star_chance = 0;
+    }
+}
+
+
+void draw_hyperspeed_rocket(rafgl_raster_t *raster, int width, int height, float delta_time) {
+    static float elongation_factor = 1.0f;
+    const float max_elongation = 100.0f;
+
+    // Increase elongation factor over time
+    elongation_factor += delta_time * 5;
+    if (elongation_factor > max_elongation) {
+        elongation_factor = max_elongation;
+    }
+
+    // Base positions
+    const int start_rx_tip = width / 2;
+    const int start_ry_tip = (height / 8) * 6;
+    const int start_rx_left = width / 4;
+    const int start_ry_left = (height / 8) * 7;
+    const int start_rx_right = (width / 4) * 3;
+    const int start_ry_right = (height / 8) * 7;
+
+    // Apply elongation
+    int rx_tip = start_rx_tip;
+    int ry_tip = (start_ry_tip - elongation_factor * 10 > height / 2 + 150)
+        ? start_ry_tip - elongation_factor * 10
+        : height / 2 + 150;
+
+    int rx_left = (start_rx_left + elongation_factor * 10 < width / 2 - 200)
+        ? start_rx_left + elongation_factor * 10
+        : width / 2 - 200;
+    int ry_left = start_ry_left;
+
+    int rx_right = (start_rx_right - elongation_factor * 10 > width / 2 + 200)
+        ? start_rx_right - elongation_factor * 10
+        : width / 2 + 200;
+    int ry_right = start_ry_right;
+
+    // Add shaking effect
+    static float shake_intensity = 1; // Adjust intensity of the shake
+    int shake_x = (rand() % (2 * (int) shake_intensity + 1)) - (int) shake_intensity; // Random [-shake_intensity, shake_intensity]
+    int shake_y = (rand() % (2 * (int) shake_intensity + 1)) - (int) shake_intensity;
+
+    rx_tip += shake_x;
+    ry_tip += shake_y;
+    rx_left += shake_x;
+    ry_left += shake_y;
+    rx_right += shake_x;
+    ry_right += shake_y;
+
+    // Set color (white lines)
+    int color = rafgl_RGB(255, 255, 255);
+
+    // Draw the triangle with thick lines
+    for (int offset = -2; offset <= 2; offset++) {
+        rafgl_raster_draw_line_custom(raster, rx_tip + offset, ry_tip, rx_left + offset, ry_left, color);
+        rafgl_raster_draw_line_custom(raster, rx_tip + offset, ry_tip, rx_right + offset, ry_right, color);
+        rafgl_raster_draw_line_custom(raster, rx_left + offset, ry_left, rx_right + offset, ry_right, color);
+    }
+
+    shake_intensity += 0.5;
+}
+
+
+
 
 void move_background_stars() {
     //printf("COUNT CLOSEST: %d\n", closest_stars_count);

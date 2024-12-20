@@ -12,13 +12,12 @@
 #include <utility.h>
 
 static rafgl_raster_t raster, raster2, perlin_raster, galaxy_texture, background_raster, handbrake_raster, hyper_raster;
-static rafgl_raster_t raw_background;
+static rafgl_raster_t raw_background, raw_hyperdrive;
 static rafgl_spritesheet_t smoke_spritesheet, black_hole_spritesheet;
 
 static rafgl_raster_t test_raster;
 
 static rafgl_texture_t texture;
-
 
 int hole_x = 0;
 int hole_y = 0;
@@ -59,7 +58,7 @@ int whiteout_active = 0;
 /// FPS CONTROL CENTER
 int hot_vignette = 1;   /// TURN ON/OFF SUN PROXIMITY VIGNETTE
 int smoke_effects = 1;  /// 0 - NO SMOKE; 1 - SMOKE
-int num_planets = 4;    /// 0,1,2 - OK;   3,4... - SHITS THE BED
+int num_planets = 5;    /// 0,1,2 - OK;   3,4... - SHITS THE BED
 
 void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     raster_width = width;
@@ -76,6 +75,7 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     rafgl_raster_init(&test_raster, raster_width, raster_height);
     rafgl_raster_init(&hyper_raster, raster_width, raster_height);
     rafgl_raster_init(&raw_background, raster_width, raster_height);
+    rafgl_raster_init(&raw_hyperdrive, raster_width, raster_height);
     rafgl_raster_load_from_image(&handbrake_raster, "res/images/handbrake.jpeg");
 
     rafgl_spritesheet_init(&smoke_spritesheet, "res/images/plumeplume.png", 6, 5);
@@ -97,11 +97,11 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
 
     init_stars();
 
-    for (int i = 0; i < RASTER_WIDTH; i++) {
-        for (int j = 0; j < RASTER_HEIGHT; j++) {
-            pixel_at_m(hyper_raster, i, j) = (rafgl_pixel_rgb_t){255, 255, 255};
-        }
-    }
+    // for (int i = 0; i < RASTER_WIDTH; i++) {
+    //     for (int j = 0; j < RASTER_HEIGHT; j++) {
+    //         pixel_at_m(hyper_raster, i, j) = (rafgl_pixel_rgb_t){255, 255, 255};
+    //     }
+    // }
 
     /// ROCKET
     rocket = init_spaceship(solar_system.black_hole, 0.0, 0., 10);
@@ -123,6 +123,9 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
 int pressed;
 float location = 0;
 float selector = 0;
+
+int show_hyperdrive = 0;
+float hyperdrive_timer = 0;
 
 
 void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *game_data, void *args)
@@ -244,11 +247,11 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
                     result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor));
                     result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor));
                 }
-
-                    pixel_at_m(raster, i, j) = result;
+                pixel_at_m(raster, i, j) = result;
             }
         }
     } else {
+
         if (distortion_active) {
             if (distortion_duration / 2.0 < distortion_timer) {
                 whiteout_active = 1;
@@ -265,9 +268,9 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
                 sky_color.b = rand() % 256;
 
 
-                galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05, sky_color);
-                set_background(raw_background, galaxy_texture, sky_color);
-                solar_system = generate_next_solar_system(solar_system.next_system_color);
+                //galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05, sky_color);
+                //set_background(raw_background, galaxy_texture, sky_color);
+                //solar_system = generate_next_solar_system(solar_system.next_system_color);
 
                 orange_r = solar_system.next_system_color.r / 255.0;
                 orange_g = solar_system.next_system_color.g / 255.0;
@@ -290,24 +293,56 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
             whiteout_timer += delta_time;
             if (whiteout_timer <= whiteout_duration) {
                 apply_whiteout(raster, whiteout_timer, whiteout_duration);
+                if (hyperdrive_timer == 0.0 && whiteout_timer > whiteout_duration / 2.0)
+                    show_hyperdrive = 1;
             } else {
                 whiteout_timer = 0.0;
                 whiteout_active = 0;
+                if (!show_hyperdrive)
+                    hyperdrive_timer = 0.0;
             }
+        }
 
+    }
+
+    if (show_hyperdrive) {
+        if (hyperdrive_timer > 5.0) {
+            render_stars_with_shaking(&raw_hyperdrive, raster.width, raster.height, delta_time, solar_system.next_system_color, 1);
+            printf("ENDED\n");
+            show_hyperdrive = 0;
+            galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05, sky_color);
+            set_background(raw_background, galaxy_texture, sky_color);
+            solar_system = generate_next_solar_system(solar_system.next_system_color);
+            //hyperdrive_timer = 0.0; // Reset the hyperdrive timer
+            init_stars();
+            rafgl_raster_init(&hyper_raster, raster_width, raster_height);
+            rafgl_raster_init(&raw_hyperdrive, raster_width, raster_height);
+            whiteout_active = 1;
+        }
+        update_stars(delta_time, raster.width, raster.height);
+        render_stars_with_shaking(&raw_hyperdrive, raster.width, raster.height, delta_time, solar_system.next_system_color, 0);
+        memcpy(hyper_raster.data, raw_hyperdrive.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
+        draw_hyperspeed_rocket(&hyper_raster, raster.width, raster.height, delta_time);
+        hyperdrive_timer += delta_time;
+        if (hyperdrive_timer > 4.0) {
+            whiteout_timer += delta_time;
+            apply_whiteout(hyper_raster, whiteout_timer, whiteout_duration);
         }
     }
-    int speed = 10 + 90 * selector;
 
-    update_stars(speed);
-    render_stars(hyper_raster, speed);
+    //update_stars(delta_time, raster.width, raster.height);
+    //render_stars(&hyper_raster, raster.width, raster.height);
+    //render_stars_with_shaking(&raw_hyperdrive, raster.width, raster.height, delta_time, solar_system.next_system_color);
+    //memcpy(hyper_raster.data, raw_hyperdrive.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
+
+    //draw_hyperspeed_rocket(&hyper_raster, raster.width, raster.height, delta_time);
 
     move_background_stars();
 }
 
 
 void main_state_render(GLFWwindow *window, void *args) {
-    rafgl_texture_load_from_raster(&texture, debug_mode ? &raster : &handbrake_raster);
+    rafgl_texture_load_from_raster(&texture, !show_hyperdrive ? &raster : &hyper_raster);
     rafgl_texture_show(&texture, 0);
 }
 

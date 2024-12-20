@@ -30,6 +30,8 @@
 #define RAFGL_INFO          2
 #define RAFGL_LOG_LEVELS    3
 
+#define RAFGL_LINE_SIZE 7
+
 
 #define pixel_at_m(r, x, y) (*(r.data + (y) * r.width + (x)))
 #define pixel_at_pm(r, x, y) (*(r->data + (y) * r->width + (x)))
@@ -291,6 +293,7 @@ void rafgl_raster_box_blur(rafgl_raster_t *result, rafgl_raster_t *tmp, rafgl_ra
 int rafgl_raster_draw_raster(rafgl_raster_t *to, rafgl_raster_t *from, int x, int y);
 
 void rafgl_raster_draw_line(rafgl_raster_t *raster, int x0, int y0, int x1, int y1, uint32_t colour);
+void rafgl_raster_draw_line_custom(rafgl_raster_t *raster, int x0, int y0, int x1, int y1, uint32_t colour);
 void rafgl_raster_draw_circle(rafgl_raster_t *raster, int cx, int cy, int r, uint32_t colour);
 void rafgl_raster_draw_rectangle(rafgl_raster_t *raster, int x0, int y0, int w, int h, uint32_t colour);
 
@@ -905,6 +908,103 @@ void rafgl_raster_draw_line(rafgl_raster_t *raster, int x0, int y0, int x1, int 
     while(1)
     {
         pixel_at_pm(raster, x0, y0).rgba = colour;
+        if (x0==x1 && y0==y1) break;
+        e2 = 2*err;
+        if (e2 >= dy) { err += dy; x0 += sx; } /* e_xy+e_x > 0 */
+        if (e2 <= dx) { err += dx; y0 += sy; } /* e_xy+e_y < 0 */
+    }
+
+}
+
+/// crta debelu liniju
+void rafgl_raster_draw_line_custom(rafgl_raster_t *raster, int x0, int y0, int x1, int y1, uint32_t colour)
+{
+
+    int xmin = 0, ymin = 0, xmax = raster->width - 1, ymax = raster->height - 1;
+    int outcode0 = __compute_outcode(x0, y0, raster);
+    int outcode1 = __compute_outcode(x1, y1, raster);
+    int accept = 0;
+    int xnew, ynew;
+    int outside_outcode;
+
+    while(1)
+    {
+
+        if(!(outcode0 | outcode1))
+        {
+            /* trivijalno prihvatanje */
+            accept = 1;
+            break;
+        }
+        else if(outcode0 & outcode1)
+        {
+            /* trivijalno odbacivanje */
+            break;
+        }
+        else
+        {
+            outside_outcode = outcode0 ? outcode0 : outcode1;
+            if(outside_outcode & __cohsuth_TOP)
+            {
+                xnew = x0 + (x1 - x0) * (ymax - y0) / (y1 - y0);
+                ynew = ymax;
+            }
+            else if(outside_outcode & __cohsuth_BOTTOM)
+            {
+                xnew = x0 + (x1 - x0) * (ymin - y0) / (y1 - y0);
+				ynew = ymin;
+            }
+            else if (outside_outcode & __cohsuth_RIGHT)
+            {
+				ynew = y0 + (y1 - y0) * (xmax - x0) / (x1 - x0);
+				xnew = xmax;
+			}
+			else if (outside_outcode & __cohsuth_LEFT)
+            {
+				ynew = y0 + (y1 - y0) * (xmin - x0) / (x1 - x0);
+				xnew = xmin;
+			}
+
+			if(outside_outcode == outcode0)
+            {
+                x0 = xnew;
+                y0 = ynew;
+                outcode0 = __compute_outcode(x0, y0, raster);
+            }
+            else
+            {
+                x1 = xnew;
+                y1 = ynew;
+                outcode1 = __compute_outcode(x1, y1, raster);
+            }
+        }
+
+
+    }
+
+
+    if(!accept)
+        return;
+
+    x0 = rafgl_clampi(x0, 0, xmax);
+    y0 = rafgl_clampi(y0, 0, ymax);
+    x1 = rafgl_clampi(x1, 0, xmax);
+    y1 = rafgl_clampi(y1, 0, ymax);
+
+
+    /* printf("---\nx0: %d\ny0: %d\nx1: %d\ny1: %d\n", x0, y0, x1, y1); */
+
+    int dx =  rafgl_abs_m((x1-x0)), sx = x0<x1 ? 1 : -1;
+    int dy = -rafgl_abs_m((y1-y0)), sy = y0<y1 ? 1 : -1;
+    int err = dx+dy, e2; /* error value e_xy */
+
+    while(1)
+    {
+        for (int i = 0; i < RAFGL_LINE_SIZE; i++) {
+            for (int j = 0; j < RAFGL_LINE_SIZE; j++) {
+                pixel_at_pm(raster, x0 + i, y0 + j).rgba = colour;
+            }
+        }
         if (x0==x1 && y0==y1) break;
         e2 = 2*err;
         if (e2 >= dy) { err += dy; x0 += sx; } /* e_xy+e_x > 0 */
