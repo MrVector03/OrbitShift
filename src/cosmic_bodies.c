@@ -728,3 +728,58 @@ void stabilize_rocket(spaceship *rocket, cosmic_body_t black_hole) {
 
     rocket->speed = 0;
 }
+
+void handle_rocket_out_of_bounds(rafgl_raster_t raster, spaceship *rocket, rafgl_spritesheet_t arrows_spritesheet, int rocket_diff_x, int rocket_diff_y) {
+    /// 0 - left, 1 - down, 2 - up, 3 - right
+    int rx = rocket->curr_x;
+    int ry = rocket->curr_y;
+    int arrow_dir = -1;
+
+    if (rx > RASTER_WIDTH)
+        arrow_dir = 3;
+    else if (rx < 0)
+        arrow_dir = 0;
+    else if (ry > RASTER_HEIGHT)
+        arrow_dir = 1;
+    else if (ry < 0)
+        arrow_dir = 2;
+
+    int arrow_x;
+    int arrow_y;
+
+    float old_dist = rafgl_distance2D(RASTER_WIDTH / 2, RASTER_HEIGHT / 2, rocket_diff_x, rocket_diff_y);
+    float new_dist = rafgl_distance2D(RASTER_WIDTH / 2, RASTER_HEIGHT / 2, rocket->curr_x, rocket->curr_y);
+
+    rafgl_pixel_rgb_t arrow_color = {255, 255, 255};
+    if (old_dist - new_dist < -1) {
+        arrow_color = (rafgl_pixel_rgb_t) {255, 0, 0};
+    } else if (old_dist - new_dist > 1) {
+        arrow_color = (rafgl_pixel_rgb_t) {0, 255, 0};
+    }
+
+    if (arrow_dir != -1) {
+        if (arrow_dir == 0) {
+            arrow_x = 0;
+            arrow_y = ry;
+            if (ry > RASTER_HEIGHT - 64) arrow_y = RASTER_HEIGHT - 64;
+            if (ry < 0) arrow_y = 0;
+        } else if (arrow_dir == 1) {
+            arrow_x = rx;
+            arrow_y = RASTER_HEIGHT - 64;
+            if (rx > RASTER_WIDTH - 64) arrow_x = RASTER_WIDTH - 64;
+            if (rx < 0) arrow_x = 0;
+        } else if (arrow_dir == 2) {
+            arrow_x = rx;
+            arrow_y = 0;
+            if (rx > RASTER_WIDTH - 64) arrow_x = RASTER_WIDTH - 64;
+            if (rx < 64) arrow_x = 0;
+        } else {
+            arrow_x = RASTER_WIDTH - 64;
+            arrow_y = ry;
+            if (ry > RASTER_HEIGHT - 64) arrow_y = RASTER_HEIGHT - 64;
+            if (ry < 0) arrow_y = 0;
+        }
+
+        rafgl_raster_draw_spritesheet_color_insteadof(&raster, &arrows_spritesheet, (rafgl_pixel_rgb_t){136, 155, 162}, arrow_color, arrow_dir, 0, arrow_x, arrow_y);
+    }
+}

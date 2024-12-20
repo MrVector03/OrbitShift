@@ -127,7 +127,7 @@ rafgl_raster_t generate_animated_perlin(int octaves, double persistence, double 
 
     int octave_size = 2;
     double multiplier = 1.0;
-    //printf("jhere")
+    //printf("here")
 
     rafgl_raster_t raster;
 
@@ -145,7 +145,6 @@ rafgl_raster_t generate_animated_perlin(int octaves, double persistence, double 
         octave_map = malloc(octave_size * octave_size * sizeof(double));
         for (y = 0; y < octave_size; y++) {
             for (x = 0; x < octave_size; x++) {
-                // Use time to influence octave values for smooth movement
                 octave_map[y * octave_size + x] = (1.0 + randf()) * 2.0 - 1.0 + sin(p_time * 0.1 + x + y);
             }
         }
@@ -163,7 +162,6 @@ rafgl_raster_t generate_animated_perlin(int octaves, double persistence, double 
 
     for (y = 0; y < height; y++) {
         for (x = 0; x < width; x++) {
-            // Modify sample value to add smooth changes
             sample = perlin_map[y * width + x] + sin(p_time * 0.05);
             sample = (sample + 1.0) / 2.0;
             if (sample < 0.0) sample = 0.0;
@@ -184,12 +182,11 @@ rafgl_raster_t generate_animated_perlin(int octaves, double persistence, double 
 
 void draw_ellipse(rafgl_raster_t raster, int xc, int yc, int rx, int ry, rafgl_pixel_rgb_t color) {
     int x, y;
-    float rx2 = rx * rx;  // Square of radius along x-axis
-    float ry2 = ry * ry;  // Square of radius along y-axis
+    float rx2 = rx * rx;
+    float ry2 = ry * ry;
     float two_rx2 = 2 * rx2;
     float two_ry2 = 2 * ry2;
 
-    // Region 1
     float p1 = ry2 - (rx2 * ry) + (0.25 * rx2);
     x = 0;
     y = ry;
@@ -197,7 +194,6 @@ void draw_ellipse(rafgl_raster_t raster, int xc, int yc, int rx, int ry, rafgl_p
     int py = two_rx2 * y;
 
     while (px < py) {
-        // Draw pixels for this point
         pixel_at_m(raster, xc + x, yc + y) = color;
         pixel_at_m(raster, xc - x, yc + y) = color;
         pixel_at_m(raster, xc + x, yc - y) = color;
@@ -214,11 +210,9 @@ void draw_ellipse(rafgl_raster_t raster, int xc, int yc, int rx, int ry, rafgl_p
         }
     }
 
-    // Region 2
     float p2 = (ry2) * (x + 0.5) * (x + 0.5) + (rx2) * (y - 1) * (y - 1) - (rx2 * ry2);
 
     while (y > 0) {
-        // Draw pixels for this point
         pixel_at_m(raster, xc + x, yc + y) = color;
         pixel_at_m(raster, xc - x, yc + y) = color;
         pixel_at_m(raster, xc + x, yc - y) = color;
@@ -245,8 +239,6 @@ double radial_gradient(int x, int y, int center_x, int center_y, int width, int 
 rafgl_pixel_rgb_t map_to_color(double value) {
     value = fmax(0.0, fmin(1.0, value));
 
-    // purple -> blue -> white -> yellow
-
     double darkness_factor = 0.1;
 
     if (value < 0.25) return (rafgl_pixel_rgb_t){value * 255 * darkness_factor, 0, 255 * darkness_factor};              // Purple
@@ -270,7 +262,6 @@ rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, doubl
 
     double max_intensity = 0.0;
 
-    // Generate Perlin noise with multiple octaves
     for (int octave = 0; octave < octaves; octave++) {
         int octave_size = pow(2, octave + 2);
         double amplitude = pow(persistence, octave);
@@ -298,7 +289,6 @@ rafgl_raster_t generate_galaxy_texture(int width, int height, int octaves, doubl
 
             rafgl_pixel_rgb_t pix = map_to_color(final_value);
 
-            // Apply tint color
             pix.r = (pix.r * 0.5 + tint.r * 0.5);
             pix.g = (pix.g * 0.5 + tint.g * 0.5);
             pix.b = (pix.b * 0.5 + tint.b * 0.5);
@@ -501,7 +491,6 @@ void apply_radial_blur(rafgl_raster_t raster, rafgl_raster_t *output, float blur
             final_color = (rafgl_pixel_rgb_t){0, 0, 0};
             total_weight = 0.0f;
 
-            // Radial sampling
             for (float t = 0.0f; t <= 1.0f; t += 1.0f / blur_strength) {
                 sx = center_x + (int)(dx * t);
                 sy = center_y + (int)(dy * t);
@@ -516,13 +505,64 @@ void apply_radial_blur(rafgl_raster_t raster, rafgl_raster_t *output, float blur
                 }
             }
 
-            // Normalize the color by total weight
             final_color.r = (int)(final_color.r / total_weight);
             final_color.g = (int)(final_color.g / total_weight);
             final_color.b = (int)(final_color.b / total_weight);
 
-            // Write to output raster
             pixel_at_m(raster, x, y) = final_color;
         }
     }
 }
+
+void apply_gaussian_blur(rafgl_raster_t raster, int radius) {
+    int width = raster.width;
+    int height = raster.height;
+    rafgl_raster_t temp_raster;
+    rafgl_raster_init(&temp_raster, width, height);
+
+    float sigma = radius / 2.0f;
+    int kernel_size = 2 * radius + 1;
+    float *kernel = (float *)malloc(kernel_size * sizeof(float));
+
+    float sum = 0.0f;
+    for (int i = -radius; i <= radius; i++) {
+        kernel[i + radius] = exp(-(i * i) / (2 * sigma * sigma)) / (sqrt(2 * M_PI) * sigma);
+        sum += kernel[i + radius];
+    }
+
+    for (int i = 0; i < kernel_size; i++) {
+        kernel[i] /= sum;
+    }
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            float r = 0.0f, g = 0.0f, b = 0.0f;
+            for (int k = -radius; k <= radius; k++) {
+                int pixel_x = fmin(width - 1, fmax(0, x + k));
+                rafgl_pixel_rgb_t pixel = pixel_at_m(raster, pixel_x, y);
+                r += pixel.r * kernel[k + radius];
+                g += pixel.g * kernel[k + radius];
+                b += pixel.b * kernel[k + radius];
+            }
+            pixel_at_m(temp_raster, x, y) = (rafgl_pixel_rgb_t){(unsigned char)r, (unsigned char)g, (unsigned char)b};
+        }
+    }
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            float r = 0.0f, g = 0.0f, b = 0.0f;
+            for (int k = -radius; k <= radius; k++) {
+                int pixel_y = fmin(height - 1, fmax(0, y + k));
+                rafgl_pixel_rgb_t pixel = pixel_at_m(temp_raster, x, pixel_y);
+                r += pixel.r * kernel[k + radius];
+                g += pixel.g * kernel[k + radius];
+                b += pixel.b * kernel[k + radius];
+            }
+            pixel_at_m(raster, x, y) = (rafgl_pixel_rgb_t){(unsigned char)r, (unsigned char)g, (unsigned char)b};
+        }
+    }
+
+    free(kernel);
+    rafgl_raster_cleanup(&temp_raster);
+}
+

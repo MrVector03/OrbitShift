@@ -117,6 +117,8 @@ void render_stars_with_shaking(rafgl_raster_t *raster, int width, int height, fl
 
 void draw_hyperspeed_rocket(rafgl_raster_t *raster, int width, int height, float delta_time);
 
+void handle_rocket_out_of_bounds(rafgl_raster_t raster, spaceship *rocket, rafgl_spritesheet_t arrows_spritesheet, int rocket_diff_x, int rocket_diff_y);
+
 #endif //COSMIC_BODIES_H
 
 

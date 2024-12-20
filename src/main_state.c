@@ -13,7 +13,7 @@
 
 static rafgl_raster_t raster, raster2, perlin_raster, galaxy_texture, background_raster, handbrake_raster, hyper_raster;
 static rafgl_raster_t raw_background, raw_hyperdrive;
-static rafgl_spritesheet_t smoke_spritesheet, black_hole_spritesheet;
+static rafgl_spritesheet_t smoke_spritesheet, black_hole_spritesheet, chars_spritesheet, arrows_spritesheet;
 
 static rafgl_raster_t test_raster;
 
@@ -60,6 +60,11 @@ int hot_vignette = 1;   /// TURN ON/OFF SUN PROXIMITY VIGNETTE
 int smoke_effects = 1;  /// 0 - NO SMOKE; 1 - SMOKE
 int num_planets = 5;    /// 0,1,2 - OK;   3,4... - SHITS THE BED
 
+int systems_visited = 0;
+
+int last_rocket_x = 0;
+int last_rocket_y = 0;
+
 void main_state_init(GLFWwindow *window, void *args, int width, int height) {
     raster_width = width;
     raster_height = height;
@@ -80,6 +85,8 @@ void main_state_init(GLFWwindow *window, void *args, int width, int height) {
 
     rafgl_spritesheet_init(&smoke_spritesheet, "res/images/plumeplume.png", 6, 5);
     rafgl_spritesheet_init(&black_hole_spritesheet, "res/images/black_hole_spritesheet.png", 8, 8);
+    rafgl_spritesheet_init(&chars_spritesheet, "res/fonts/chars-large.png", 16, 6);
+    rafgl_spritesheet_init(&arrows_spritesheet, "res/images/arrows.png", 4, 1);
 
     /// GALAXY TEXTURE
     perlin_raster = generate_perlin(8, 0.7);
@@ -127,9 +134,22 @@ float selector = 0;
 int show_hyperdrive = 0;
 float hyperdrive_timer = 0;
 
+int game_over = 0;
+
 
 void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *game_data, void *args)
 {
+
+    if (game_over) {
+        char systems_visited_str[10];
+        sprintf(systems_visited_str, "%d", systems_visited);
+        char game_over_text[50] = "    GAME OVER\nSYSTEMS VISITED: ";
+
+        strcat(game_over_text, systems_visited_str);
+        rafgl_raster_draw_string(&raster, game_over_text, RASTER_WIDTH / 2 - 280, RASTER_HEIGHT / 2 - 20, (u_int32_t) 255, 20);
+        return;
+    }
+
     /* hendluj input */
     if(game_data->is_lmb_down && game_data->is_rmb_down)
     {
@@ -204,7 +224,6 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
     render_planets(raster, black_hole_spritesheet, &solar_system);
 
 
-
     if (!distortion_active && !whiteout_active) {
         int moved = 0;
         if (game_data->keys_down[GLFW_KEY_W]) {
@@ -250,6 +269,18 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
                 pixel_at_m(raster, i, j) = result;
             }
         }
+        if (rocket_sun_dist < 25.0) {
+            apply_gaussian_blur(raster, 5);
+            game_over = 1;
+        }
+        for (int k = 0; k < solar_system.num_bodies; k++) {
+            int px = solar_system.planets[k].current_x;
+            int py = solar_system.planets[k].current_y;
+            if (rafgl_distance2D(px, py, rocket.curr_x, rocket.curr_y) < solar_system.planets[k].radius) {
+                apply_gaussian_blur(raster, 5);
+                game_over = 1;
+            }
+        }
     } else {
 
         if (distortion_active) {
@@ -266,11 +297,6 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
                 sky_color.r = rand() % 256;
                 sky_color.g = rand() % 256;
                 sky_color.b = rand() % 256;
-
-
-                //galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05, sky_color);
-                //set_background(raw_background, galaxy_texture, sky_color);
-                //solar_system = generate_next_solar_system(solar_system.next_system_color);
 
                 orange_r = solar_system.next_system_color.r / 255.0;
                 orange_g = solar_system.next_system_color.g / 255.0;
@@ -313,6 +339,7 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
             galaxy_texture = generate_galaxy_texture(raster_width, raster_height, 4, 0.05, sky_color);
             set_background(raw_background, galaxy_texture, sky_color);
             solar_system = generate_next_solar_system(solar_system.next_system_color);
+            systems_visited += 1;
             //hyperdrive_timer = 0.0; // Reset the hyperdrive timer
             init_stars();
             rafgl_raster_init(&hyper_raster, raster_width, raster_height);
@@ -330,14 +357,12 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
         }
     }
 
-    //update_stars(delta_time, raster.width, raster.height);
-    //render_stars(&hyper_raster, raster.width, raster.height);
-    //render_stars_with_shaking(&raw_hyperdrive, raster.width, raster.height, delta_time, solar_system.next_system_color);
-    //memcpy(hyper_raster.data, raw_hyperdrive.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
-
-    //draw_hyperspeed_rocket(&hyper_raster, raster.width, raster.height, delta_time);
+    handle_rocket_out_of_bounds(raster, &rocket, arrows_spritesheet, last_rocket_x, last_rocket_y);
 
     move_background_stars();
+
+    last_rocket_x = rocket.curr_x;
+    last_rocket_y = rocket.curr_y;
 }
 
 

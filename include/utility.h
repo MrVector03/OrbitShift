@@ -35,4 +35,6 @@ void custom_rafgl_raster_draw_spritesheet(rafgl_raster_t *raster, rafgl_spritesh
 
 void apply_radial_blur(rafgl_raster_t raster, rafgl_raster_t *output, float blur_strength);
 
+void apply_gaussian_blur(rafgl_raster_t raster, int radius);
+
 #endif //UTILITY_H

@@ -208,6 +208,8 @@ int rafgl_raster_cleanup(rafgl_raster_t *raster);
 
 void rafgl_spritesheet_init(rafgl_spritesheet_t *spritesheet, const char *sheet_path, int sheet_width, int sheet_height);
 void rafgl_raster_draw_spritesheet(rafgl_raster_t *raster, rafgl_spritesheet_t *spritesheet, int sheet_x, int sheet_y, int x, int y);
+void rafgl_raster_draw_spritesheet_color_insteadof(rafgl_raster_t *raster, rafgl_spritesheet_t *spritesheet, rafgl_pixel_rgb_t insteadof_color, rafgl_pixel_rgb_t new_color, int sheet_x, int sheet_y, int x, int y);
+
 
 void rafgl_log(int level, const char *format, ...);
 
@@ -660,6 +662,67 @@ void rafgl_raster_draw_spritesheet(rafgl_raster_t *raster, rafgl_spritesheet_t *
             if(sampled.rgba != RAFGL_COLOUR_KEY.rgba)
             {
                 pixel_at_pm(raster, xi, yi) = sampled;
+            }
+        }
+    }
+
+}
+
+void rafgl_raster_draw_spritesheet_color_insteadof(rafgl_raster_t *raster, rafgl_spritesheet_t *spritesheet, rafgl_pixel_rgb_t insteadof_color, rafgl_pixel_rgb_t new_color, int sheet_x, int sheet_y, int x, int y)
+{
+    int fl, fr, fu, fd;
+    int flc, frc, fuc, fdc;
+    int xi, yi;
+
+    rafgl_pixel_rgb_t sampled;
+
+    fl = x;
+    fr = x + spritesheet->frame_width;
+    fu = y;
+    fd = y + spritesheet->frame_height;
+
+    flc = rafgl_max_m(fl, 0);
+    frc = rafgl_min_m(fr, raster->width);
+    fuc = rafgl_max_m(fu, 0);
+    fdc = rafgl_min_m(fd, raster->height);
+
+    for(yi = fuc; yi < fdc; yi++)
+    {
+        for(xi = flc; xi < frc; xi++)
+        {
+            sampled = pixel_at_m(spritesheet->sheet, sheet_x * spritesheet->frame_width + xi - fl, sheet_y * spritesheet->frame_height + yi - fu);
+            if(sampled.rgba != RAFGL_COLOUR_KEY.rgba)
+            {
+                int not_same = 1;
+                for (int i = 0; i < 3; i++)
+                {
+                    for (int j = -3; j < 3; j++)
+                    {
+                        if (sampled.r == insteadof_color.r + j && sampled.g == insteadof_color.g + j)
+                        {
+                            not_same = 0;
+                            break;
+                        }
+                        if (sampled.b == insteadof_color.b + j && sampled.g == insteadof_color.g + j)
+                        {
+                            not_same = 0;
+                            break;
+                        }
+                        if (sampled.r == insteadof_color.r + j && sampled.b == insteadof_color.b + j)
+                        {
+                            not_same = 0;
+                            break;
+                        }
+                    }
+                }
+                if (!not_same)
+                {
+                    pixel_at_pm(raster, xi, yi) = new_color;
+                }
+                else
+                {
+                    pixel_at_pm(raster, xi, yi) = sampled;
+                }
             }
         }
     }
