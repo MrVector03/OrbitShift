@@ -41,11 +41,9 @@ void update_stars(float delta_time, int width, int height) {
     for (int i = 0; i < MAX_HYPER_STARS; i++) {
         hyperdrive_stars[i].z -= hyperdrive_stars[i].speed * delta_time;
 
-        // Add chaotic direction offsets
         hyperdrive_stars[i].x += ((float)rand() / RAND_MAX - 0.5f) * 0.1f;
         hyperdrive_stars[i].y += ((float)rand() / RAND_MAX - 0.5f) * 0.1f;
 
-        // Reset if out of bounds or too close
         if (hyperdrive_stars[i].z <= 0 || fabs(hyperdrive_stars[i].x / hyperdrive_stars[i].z) > width || fabs(hyperdrive_stars[i].y / hyperdrive_stars[i].z) > height) {
             hyperdrive_stars[i].x = ((float)rand() / RAND_MAX - 0.5f) * width * 2.0f;
             hyperdrive_stars[i].y = ((float)rand() / RAND_MAX - 0.5f) * height * 2.0f;
@@ -69,7 +67,7 @@ void render_stars(rafgl_raster_t *raster, int width, int height) {
         int screen_cur_x = (int)(cur_x * width + width / 2);
         int screen_cur_y = (int)(cur_y * height + height / 2);
 
-        int color = rafgl_RGB(rand() % 256, rand() % 256, 255); // Chaotic colors
+        int color = rafgl_RGB(rand() % 256, rand() % 256, 255);
 
         rafgl_raster_draw_line(raster, screen_cur_x, screen_cur_y, screen_prev_x, screen_prev_y, color);
     }
@@ -81,15 +79,12 @@ void render_stars_with_shaking(rafgl_raster_t *raster, int width, int height, fl
     static int system_star_chance = 0;
     system_star_chance += 1;
 
-    // Update shake intensity
-    shake_intensity += delta_time * 0.5f; // Increase shake over time
+    shake_intensity += delta_time * 0.5f;
     if (shake_intensity > max_shake) shake_intensity = max_shake;
 
-    // Generate random offsets
     float random_offset_x = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * shake_intensity;
     float random_offset_y = ((float)rand() / RAND_MAX - 0.5f) * 2.0f * shake_intensity;
 
-    // Render stars with rumbling effect
     for (int i = 0; i < MAX_HYPER_STARS; i++) {
         float streak_length = 1.0f + (50.0f / hyperdrive_stars[i].z);
         float prev_x = hyperdrive_stars[i].x / (hyperdrive_stars[i].z + hyperdrive_stars[i].speed * streak_length);
@@ -102,8 +97,8 @@ void render_stars_with_shaking(rafgl_raster_t *raster, int width, int height, fl
         int screen_cur_x = (int)(cur_x * width + width / 2 + random_offset_x);
         int screen_cur_y = (int)(cur_y * height + height / 2 + random_offset_y);
 
-        int color = rafgl_RGB(rand() % 256, rand() % 256, 255); // Chaotic colors
-        /// chances for system star color are getting increasingly higher as time goes on
+        int color = rafgl_RGB(rand() % 256, rand() % 256, 255);
+
         if (system_star_chance > 75) {
             color = rafgl_RGB(next_system_color.r, next_system_color.g, next_system_color.b);
         }
@@ -123,13 +118,11 @@ void draw_hyperspeed_rocket(rafgl_raster_t *raster, int width, int height, float
     static float elongation_factor = 1.0f;
     const float max_elongation = 100.0f;
 
-    // Increase elongation factor over time
     elongation_factor += delta_time * 5;
     if (elongation_factor > max_elongation) {
         elongation_factor = max_elongation;
     }
 
-    // Base positions
     const int start_rx_tip = width / 2;
     const int start_ry_tip = (height / 8) * 6;
     const int start_rx_left = width / 4;
@@ -137,7 +130,6 @@ void draw_hyperspeed_rocket(rafgl_raster_t *raster, int width, int height, float
     const int start_rx_right = (width / 4) * 3;
     const int start_ry_right = (height / 8) * 7;
 
-    // Apply elongation
     int rx_tip = start_rx_tip;
     int ry_tip = (start_ry_tip - elongation_factor * 10 > height / 2 + 150)
         ? start_ry_tip - elongation_factor * 10
@@ -153,7 +145,6 @@ void draw_hyperspeed_rocket(rafgl_raster_t *raster, int width, int height, float
         : width / 2 + 200;
     int ry_right = start_ry_right;
 
-    // Add shaking effect
     static float shake_intensity = 1; // Adjust intensity of the shake
     int shake_x = (rand() % (2 * (int) shake_intensity + 1)) - (int) shake_intensity; // Random [-shake_intensity, shake_intensity]
     int shake_y = (rand() % (2 * (int) shake_intensity + 1)) - (int) shake_intensity;
@@ -165,10 +156,8 @@ void draw_hyperspeed_rocket(rafgl_raster_t *raster, int width, int height, float
     rx_right += shake_x;
     ry_right += shake_y;
 
-    // Set color (white lines)
     int color = rafgl_RGB(255, 255, 255);
 
-    // Draw the triangle with thick lines
     for (int offset = -2; offset <= 2; offset++) {
         rafgl_raster_draw_line_custom(raster, rx_tip + offset, ry_tip, rx_left + offset, ry_left, color);
         rafgl_raster_draw_line_custom(raster, rx_tip + offset, ry_tip, rx_right + offset, ry_right, color);
@@ -243,7 +232,7 @@ void draw_realistic_sun(rafgl_raster_t raster, int x, int y, int radius) {
 
 float vignette_strength(float distance_to_sun, float max_effect_distance, float max_intensity) {
     if (distance_to_sun > max_effect_distance) {
-        return 0.0f; // No vignette effect outside the range
+        return 0.0f;
     }
     return max_intensity * (1.0f - (distance_to_sun / max_effect_distance));
 }
@@ -290,22 +279,17 @@ void render_planets(rafgl_raster_t raster, rafgl_spritesheet_t black_hole_sprite
 
 double previous_noise = 0.0;
 
-// Function to smoothly transition noise over time
 double smooth_noise(double current_noise, double smooth_factor) {
     return previous_noise * (1 - smooth_factor) + current_noise * smooth_factor;
 }
 
-// Function to map noise to a color (Yellow to Red)
 rafgl_pixel_rgb_t map_noise_to_sun_color(double noise_value) {
-    // Make sure the noise value is between 0.0 and 1.0
     noise_value = fmin(fmax(noise_value, 0.0), 1.0);
 
-    // Map noise_value to a sun-like color (Yellow to Red)
-    // 1.0 -> Red, 0.0 -> Yellow
 
-    unsigned char b = (unsigned char)(255 * noise_value);  // Red increases as noise increases
-    unsigned char r = (unsigned char)(255 * (1 - noise_value));  // Green decreases as noise increases
-    unsigned char g = 0;  // Blue is 0 to keep the color yellow to red
+    unsigned char b = (unsigned char)(255 * noise_value);
+    unsigned char r = (unsigned char)(255 * (1 - noise_value));
+    unsigned char g = 0;
 
     return (rafgl_pixel_rgb_t){r, g, b};
 }
