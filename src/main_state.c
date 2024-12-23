@@ -245,34 +245,13 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
         draw_rocket(raster, &rocket, smoke_spritesheet, delta_time, moved);
 
         // TODO: Smoothly blend hot and normal vignettes
-        for (int i = 0; i < raster.width; i++) {
-            for (int j = 0; j < raster.height; j++) {
-                dist = rafgl_distance2D(i, j, cx, cy) / r;
+        render_proximity_vignette(raster, cx, cy, vignette_factor, rocket_sun_dist, vignette_r, vignette_g, vignette_b, r);
 
-                dist = powf(dist, 1.8f); // You can adjust this exponent to control the softness of the vignette
-
-                sampled = pixel_at_m(raster, i, j);
-
-                float tint_factor = dist * vignette_factor;
-
-                if (rocket_sun_dist < 100.0) {
-                    float proximity_factor = 1.0 - (rocket_sun_dist / 100.0);
-                    tint_factor *= proximity_factor;
-                    result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor) + vignette_r * tint_factor * 255);
-                    result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor) + vignette_g * tint_factor * 255);
-                    result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor) + vignette_b * tint_factor * 255);
-                } else {
-                    result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor));
-                    result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor));
-                    result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor));
-                }
-                pixel_at_m(raster, i, j) = result;
-            }
-        }
         if (rocket_sun_dist < 25.0) {
             apply_gaussian_blur(raster, 5);
             game_over = 1;
         }
+
         for (int k = 0; k < solar_system.num_bodies; k++) {
             int px = solar_system.planets[k].current_x;
             int py = solar_system.planets[k].current_y;

@@ -323,7 +323,7 @@ rafgl_raster_t generate_perlin_with_color(int octaves, double persistence) {
     double multiplier = 1.0;
     rafgl_raster_t raster;
 
-    int width = RASTER_WIDTH;  // You can adjust the width/height size as needed
+    int width = RASTER_WIDTH;
     int height = RASTER_HEIGHT;
 
     int x, y, octave;
@@ -333,7 +333,6 @@ rafgl_raster_t generate_perlin_with_color(int octaves, double persistence) {
     rafgl_pixel_rgb_t pix;
     rafgl_raster_init(&raster, width, height);
 
-    // Generate Perlin noise with octaves
     for (octave = 0; octave < octaves; octave++) {
         octave_map = malloc(octave_size * octave_size * sizeof(double));
 
@@ -352,7 +351,6 @@ rafgl_raster_t generate_perlin_with_color(int octaves, double persistence) {
         free(octave_map);
     }
 
-    // Color map and texture generation
     float sample;
     for (y = 0; y < height; y++) {
         for (x = 0; x < width; x++) {
@@ -401,23 +399,19 @@ void apply_distortion(rafgl_raster_t raster, float distortion_factor) {
 
     for (int y = 0; y < raster.height; y++) {
         for (int x = 0; x < raster.width; x++) {
-            // Calculate distortion offsets
             float offset_x = sin(y * 0.05f) * distortion_factor;
             float offset_y = cos(x * 0.05f) * distortion_factor;
 
-            // Source pixel position
             int src_x = (int)(x + offset_x) % raster.width;
             int src_y = (int)(y + offset_y) % raster.height;
 
             if (src_x < 0) src_x += raster.width;
             if (src_y < 0) src_y += raster.height;
 
-            // Copy the distorted pixel
             pixel_at_m(temp_raster, x, y) = pixel_at_m(raster, src_x, src_y);
         }
     }
 
-    // Copy back to the original raster
     memcpy(raster.data, temp_raster.data, raster.width * raster.height * sizeof(rafgl_pixel_rgb_t));
 
     rafgl_raster_cleanup(&temp_raster);
@@ -566,3 +560,30 @@ void apply_gaussian_blur(rafgl_raster_t raster, int radius) {
     rafgl_raster_cleanup(&temp_raster);
 }
 
+void render_proximity_vignette(rafgl_raster_t raster, int cx, int cy, float vignette_factor, float rocket_sun_dist, float vignette_r, float vignette_g, float vignette_b, float r) {
+    for (int i = 0; i < raster.width; i++) {
+        for (int j = 0; j < raster.height; j++) {
+            float dist = rafgl_distance2D(i, j, cx, cy) / r;
+
+            dist = powf(dist, 1.8f);
+
+            rafgl_pixel_rgb_t sampled = pixel_at_m(raster, i, j);
+            rafgl_pixel_rgb_t result;
+
+            float tint_factor = dist * vignette_factor;
+
+            if (rocket_sun_dist < 100.0) {
+                float proximity_factor = 1.0 - (rocket_sun_dist / 100.0);
+                tint_factor *= proximity_factor;
+                result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor) + vignette_r * tint_factor * 255);
+                result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor) + vignette_g * tint_factor * 255);
+                result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor) + vignette_b * tint_factor * 255);
+            } else {
+                result.r = rafgl_saturatei(sampled.r * (1.0f - tint_factor));
+                result.g = rafgl_saturatei(sampled.g * (1.0f - tint_factor));
+                result.b = rafgl_saturatei(sampled.b * (1.0f - tint_factor));
+            }
+            pixel_at_m(raster, i, j) = result;
+        }
+    }
+}

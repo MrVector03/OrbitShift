@@ -37,4 +37,6 @@ void apply_radial_blur(rafgl_raster_t raster, rafgl_raster_t *output, float blur
 
 void apply_gaussian_blur(rafgl_raster_t raster, int radius);
 
+void render_proximity_vignette(rafgl_raster_t raster, int cx, int cy, float vignette_factor, float rocket_sun_dist, float vignette_r, float vignette_g, float vignette_b, float r);
+
 #endif //UTILITY_H
