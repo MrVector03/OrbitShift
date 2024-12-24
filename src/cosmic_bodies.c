@@ -113,7 +113,6 @@ void render_stars_with_shaking(rafgl_raster_t *raster, int width, int height, fl
     }
 }
 
-
 void draw_hyperspeed_rocket(rafgl_raster_t *raster, int width, int height, float delta_time) {
     static float elongation_factor = 1.0f;
     const float max_elongation = 100.0f;
@@ -166,9 +165,6 @@ void draw_hyperspeed_rocket(rafgl_raster_t *raster, int width, int height, float
 
     shake_intensity += 0.5;
 }
-
-
-
 
 void move_background_stars() {
     //printf("COUNT CLOSEST: %d\n", closest_stars_count);
@@ -256,7 +252,8 @@ void render_planets(rafgl_raster_t raster, rafgl_spritesheet_t black_hole_sprite
             }
         }
     }
-
+    cosmic_body_t *black_hole = &solar_system->black_hole;
+    apply_fisheye_lens(&raster, black_hole->current_x + black_hole->radius, black_hole->current_y + black_hole->radius, black_hole->radius * 3);
     rafgl_raster_draw_spritesheet(&raster, &black_hole_spritesheet,
         solar_system->black_hole.bh_curr_frame_x,
         solar_system->black_hole.bh_curr_frame_y,
@@ -765,5 +762,46 @@ void handle_rocket_out_of_bounds(rafgl_raster_t raster, spaceship *rocket, rafgl
         }
 
         rafgl_raster_draw_spritesheet_color_insteadof(&raster, &arrows_spritesheet, (rafgl_pixel_rgb_t){136, 155, 162}, arrow_color, arrow_dir, 0, arrow_x, arrow_y);
+    }
+}
+
+rafgl_raster_t temp_raster;
+
+void apply_fisheye_lens(rafgl_raster_t *raster, int cx, int cy, int radius) {
+    rafgl_raster_init(&temp_raster, raster->width, raster->height);
+    memcpy(temp_raster.data, raster->data, raster->width * raster->height * sizeof(rafgl_pixel_rgb_t));
+
+    for (int y = -radius; y <= radius; y++) {
+        for (int x = -radius; x <= radius; x++) {
+            int fx = cx + x;
+            int fy = cy + y;
+
+            if (fx < 0 || fx >= raster->width || fy < 0 || fy >= raster->height)
+                continue;
+
+            float distance = sqrt(x * x + y * y);
+            if (distance > radius)
+                continue;
+
+            float normalized_distance = distance / radius;
+            float angle = atan2(y, x);
+
+            float distorted_distance;
+            if (y < 0) {
+                // pull in
+                distorted_distance = pow(normalized_distance, 0.5);
+            } else {
+                // push out
+                distorted_distance = pow(normalized_distance, 2.0);
+            }
+
+            int source_x = (int)(cx + distorted_distance * radius * cos(angle));
+            int source_y = (int)(cy + distorted_distance * radius * sin(angle));
+
+            if (source_x >= 0 && source_x < raster->width && source_y >= 0 && source_y < raster->height) {
+                raster->data[fy * raster->width + fx] =
+                    temp_raster.data[source_y * raster->width + source_x];
+            }
+        }
     }
 }

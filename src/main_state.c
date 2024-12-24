@@ -307,7 +307,6 @@ void main_state_update(GLFWwindow *window, float delta_time, rafgl_game_data_t *
                     hyperdrive_timer = 0.0;
             }
         }
-
     }
 
     if (show_hyperdrive) {
